@@ -1,0 +1,910 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Karibu Academy — Owner Console</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+<script src="/runtime-config.js"></script>
+<style>
+  html, body { margin: 0; padding: 0; }
+  button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible {
+    outline: 3px solid #E8A33D;
+    outline-offset: 2px;
+  }
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script>
+// =====================================================================
+// SUPABASE CONFIG (same project, separate owner-only functions)
+// =====================================================================
+const SUPABASE_URL = window.KARIBU_SUPABASE_URL || "https://YOUR-V2-PROJECT.supabase.co";
+const AUTH_TOKEN_KEY = "karibu-v2-auth-token";
+
+function restaurantSlug(name) {
+  return String(name || "restaurant").toLowerCase().trim().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "") || "restaurant";
+}
+
+async function staffAppUrl(name, restaurantId) {
+  const baseSlug = restaurantSlug(name);
+  const {
+    data: existing
+  } = await callRpc("get_restaurant_by_slug", {
+    p_slug: baseSlug
+  });
+
+  // Keep this in sync with make_restaurant_slug(): duplicate names get a
+  // short, deterministic suffix so every public URL remains unique.
+  const slug = existing?.id && existing.id !== restaurantId
+    ? `${baseSlug}-${String(restaurantId).replace(/-/g, "").slice(0, 6)}`
+    : baseSlug;
+  return `${window.location.origin}/${slug}`;
+}
+
+const SUPABASE_ANON_KEY = window.KARIBU_SUPABASE_ANON_KEY || "YOUR_V2_PUBLISHABLE_OR_ANON_KEY";
+async function callRpc(name, params) {
+  const loginRpc = name === "owner_login" || name === "staff_login";
+  const authToken = loginRpc ? null : (() => {
+    try { return localStorage.getItem(AUTH_TOKEN_KEY); } catch (_) { return null; }
+  })();
+  const requestParams = authToken ? { ...params, p_auth_token: authToken } : params;
+  try {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/rpc/${name}`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        apikey: SUPABASE_ANON_KEY,
+        Authorization: `Bearer ${SUPABASE_ANON_KEY}`
+      },
+      body: JSON.stringify(requestParams)
+    });
+    const body = await res.json().catch(() => null);
+    if (!res.ok) return {
+      data: null,
+      error: body || {
+        message: res.statusText
+      }
+    };
+    return {
+      data: body,
+      error: null
+    };
+  } catch (err) {
+    return {
+      data: null,
+      error: {
+        message: err.message
+      }
+    };
+  }
+}
+const COLORS = {
+  espresso: "#2B2420",
+  marigold: "#E8A33D",
+  marigoldDeep: "#8A5614",
+  avocado: "#4F6F52",
+  avocadoLight: "#E4EDE2",
+  clay: "#B5473A",
+  clayLight: "#F5E2DF",
+  ivory: "#FBF6EC",
+  stone: "#6B5D4C",
+  tan: "#D8CBB5"
+};
+const STATUS_META = {
+  active: {
+    label: "Active",
+    color: COLORS.avocado,
+    bg: COLORS.avocadoLight
+  },
+  trial: {
+    label: "Trial",
+    color: COLORS.marigoldDeep,
+    bg: "#F1E9DA"
+  },
+  overdue: {
+    label: "Overdue",
+    color: "#8A5614",
+    bg: "#FBEBD2"
+  },
+  blocked: {
+    label: "Blocked",
+    color: COLORS.clay,
+    bg: COLORS.clayLight
+  }
+};
+function Login({
+  onLoggedIn
+}) {
+  const [name, setName] = React.useState("");
+  const [pin, setPin] = React.useState("");
+  const [error, setError] = React.useState("");
+  const [loading, setLoading] = React.useState(false);
+  async function handleSubmit(e) {
+    e.preventDefault();
+    if (!name.trim() || pin.length !== 4) {
+      setError("Enter your name and your 4-digit owner PIN.");
+      return;
+    }
+    setLoading(true);
+    setError("");
+    const {
+      data,
+      error: rpcError
+    } = await callRpc("owner_login", {
+      p_full_name: name.trim(),
+      p_pin: pin
+    });
+    setLoading(false);
+    if (rpcError) {
+      setError("Couldn't connect. Please try again.");
+      return;
+    }
+    if (!data.success) {
+      setError("The owner name or PIN is incorrect, or the account is temporarily locked.");
+      return;
+    }
+    try { localStorage.setItem(AUTH_TOKEN_KEY, data.auth_token); } catch (_) {}
+    onLoggedIn({
+      ownerId: data.owner_id,
+      fullName: data.full_name
+    });
+  }
+  return /*#__PURE__*/React.createElement("div", {
+    style: styles.page
+  }, /*#__PURE__*/React.createElement("div", {
+    style: styles.loginCard
+  }, /*#__PURE__*/React.createElement("span", {
+    style: styles.eyebrow
+  }, "KARIBU ACADEMY"), /*#__PURE__*/React.createElement("h1", {
+    style: styles.title
+  }, "Owner Console"), /*#__PURE__*/React.createElement("p", {
+    style: styles.subtitle
+  }, "Sign in with your owner name and PIN."), /*#__PURE__*/React.createElement("form", {
+    onSubmit: handleSubmit,
+    style: {
+      display: "flex",
+      flexDirection: "column",
+      gap: 14,
+      marginTop: 20
+    }
+  }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("label", {
+    style: styles.label
+  }, "Name"), /*#__PURE__*/React.createElement("input", {
+    style: styles.input,
+    value: name,
+    onChange: e => setName(e.target.value),
+    placeholder: "e.g. Andrew"
+  })), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("label", {
+    style: styles.label
+  }, "4-digit PIN"), /*#__PURE__*/React.createElement("input", {
+    style: styles.input,
+    value: pin,
+    onChange: e => setPin(e.target.value.replace(/\D/g, "").slice(0, 4)),
+    placeholder: "••••",
+    inputMode: "numeric",
+    maxLength: 4
+  })), error && /*#__PURE__*/React.createElement("div", {
+    style: styles.errorBox
+  }, error), /*#__PURE__*/React.createElement("button", {
+    style: styles.primaryBtn,
+    type: "submit",
+    disabled: loading
+  }, loading ? "Signing in..." : "Sign in"))));
+}
+function RestaurantRow({
+  r,
+  onSave,
+  onDeleted
+}) {
+  const [name, setName] = React.useState(r.name);
+  const [appName, setAppName] = React.useState(r.app_name || "Karibu Academy");
+  const [status, setStatus] = React.useState(r.payment_status);
+  const [note, setNote] = React.useState(r.payment_note || "");
+  const [saving, setSaving] = React.useState(false);
+  const [saved, setSaved] = React.useState(false);
+  const [confirmingDelete, setConfirmingDelete] = React.useState(false);
+  const [confirmText, setConfirmText] = React.useState("");
+  const [deleting, setDeleting] = React.useState(false);
+  const dirty = name !== r.name || appName !== (r.app_name || "Karibu Academy") || status !== r.payment_status || note !== (r.payment_note || "");
+  const meta = STATUS_META[status] || STATUS_META.active;
+  async function handleSave() {
+    setSaving(true);
+    setSaved(false);
+    if (name !== r.name || appName !== r.app_name) {
+      await callRpc("owner_update_branding", {
+        p_restaurant_id: r.id,
+        p_name: name,
+        p_app_name: appName
+      });
+    }
+    const {
+      data,
+      error
+    } = await callRpc("owner_update_restaurant_status", {
+      p_restaurant_id: r.id,
+      p_status: status,
+      p_note: note || null
+    });
+    setSaving(false);
+    if (!error && data?.success) {
+      setSaved(true);
+      r.name = name;
+      r.app_name = appName;
+      r.payment_status = status;
+      r.payment_note = note;
+    }
+  }
+  async function handleDelete() {
+    setDeleting(true);
+    const {
+      data,
+      error
+    } = await callRpc("owner_delete_restaurant", {
+      p_restaurant_id: r.id
+    });
+    setDeleting(false);
+    if (!error && data?.success) {
+      onDeleted(r.id);
+    }
+  }
+  return /*#__PURE__*/React.createElement("div", {
+    style: styles.row
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      justifyContent: "space-between",
+      alignItems: "center",
+      flexWrap: "wrap",
+      gap: 10
+    }
+  }, /*#__PURE__*/React.createElement("input", {
+    style: {
+      ...styles.input,
+      ...styles.restaurantNameInput
+    },
+    value: name,
+    onChange: e => setName(e.target.value)
+  }), /*#__PURE__*/React.createElement("span", {
+    style: {
+      ...styles.badge,
+      color: meta.color,
+      background: meta.bg
+    }
+  }, meta.label)), /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginTop: 12
+    }
+  }, /*#__PURE__*/React.createElement("label", {
+    style: styles.label
+  }, "App name (shown throughout the training app for this restaurant)"), /*#__PURE__*/React.createElement("input", {
+    style: styles.input,
+    value: appName,
+    onChange: e => setAppName(e.target.value),
+    placeholder: "e.g. Karibu Academy"
+  })), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 10,
+      marginTop: 12,
+      flexWrap: "wrap"
+    }
+  }, Object.keys(STATUS_META).map(key => /*#__PURE__*/React.createElement("button", {
+    key: key,
+    onClick: () => setStatus(key),
+    style: {
+      ...styles.statusOption,
+      ...(status === key ? {
+        background: STATUS_META[key].color,
+        color: "#fff",
+        borderColor: STATUS_META[key].color
+      } : {})
+    }
+  }, STATUS_META[key].label))), /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginTop: 12
+    }
+  }, /*#__PURE__*/React.createElement("label", {
+    style: styles.label
+  }, "Note (optional — visible to you only)"), /*#__PURE__*/React.createElement("input", {
+    style: styles.input,
+    value: note,
+    onChange: e => setNote(e.target.value),
+    placeholder: "e.g. Invoice #114 overdue since July 20"
+  })), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      alignItems: "center",
+      gap: 12,
+      marginTop: 12
+    }
+  }, /*#__PURE__*/React.createElement("button", {
+    style: {
+      ...styles.primaryBtn,
+      opacity: dirty ? 1 : 0.5
+    },
+    onClick: handleSave,
+    disabled: !dirty || saving
+  }, saving ? "Saving..." : "Save changes"), saved && !dirty && /*#__PURE__*/React.createElement("span", {
+    style: {
+      color: COLORS.avocado,
+      fontSize: "0.85rem"
+    }
+  }, "Saved ✓")), /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginTop: 16,
+      paddingTop: 14,
+      borderTop: "1px solid #E3D8C5"
+    }
+  }, !confirmingDelete ? /*#__PURE__*/React.createElement("button", {
+    style: {
+      ...styles.textBtn,
+      color: COLORS.clay
+    },
+    onClick: () => setConfirmingDelete(true)
+  }, "Delete this restaurant") : /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("p", {
+    style: {
+      fontSize: "0.85rem",
+      color: "#5A2A24",
+      marginBottom: 8
+    }
+  }, "This permanently deletes ", /*#__PURE__*/React.createElement("strong", null, r.name), ", all of its staff accounts, and all their training progress. This cannot be undone. Type the restaurant's name below to confirm."), /*#__PURE__*/React.createElement("input", {
+    style: styles.input,
+    value: confirmText,
+    onChange: e => setConfirmText(e.target.value),
+    placeholder: r.name
+  }), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 10,
+      marginTop: 10
+    }
+  }, /*#__PURE__*/React.createElement("button", {
+    style: {
+      ...styles.primaryBtn,
+      background: COLORS.clay,
+      opacity: confirmText === r.name ? 1 : 0.4
+    },
+    disabled: confirmText !== r.name || deleting,
+    onClick: handleDelete
+  }, deleting ? "Deleting..." : "Permanently delete"), /*#__PURE__*/React.createElement("button", {
+    style: styles.textBtn,
+    onClick: () => {
+      setConfirmingDelete(false);
+      setConfirmText("");
+    }
+  }, "Cancel")))));
+}
+const MONTH_NAMES = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+function formatDuration(totalSeconds) {
+  const mins = Math.round(totalSeconds / 60);
+  if (mins < 60) return `${mins} min`;
+  const hrs = Math.floor(mins / 60);
+  const rem = mins % 60;
+  return rem ? `${hrs}h ${rem}m` : `${hrs}h`;
+}
+function MonthlyReport({
+  restaurant,
+  onClose
+}) {
+  const now = new Date();
+  const [year, setYear] = React.useState(now.getFullYear());
+  const [month, setMonth] = React.useState(now.getMonth() + 1); // 1-12
+  const [report, setReport] = React.useState(null);
+  const [loading, setLoading] = React.useState(false);
+  const [copied, setCopied] = React.useState(false);
+  async function generate() {
+    setLoading(true);
+    setReport(null);
+    const {
+      data
+    } = await callRpc("owner_monthly_report", {
+      p_restaurant_id: restaurant.id,
+      p_year: year,
+      p_month: month
+    });
+    setLoading(false);
+    setReport(data);
+  }
+  React.useEffect(() => {
+    generate();
+    // eslint-disable-next-line
+  }, []);
+  function copyAsText() {
+    if (!report) return;
+    const lines = [];
+    lines.push(`📊 ${report.restaurant_name} — Training Report`);
+    lines.push(`${MONTH_NAMES[report.month - 1]} ${report.year}`);
+    lines.push("");
+    report.staff.forEach(s => {
+      lines.push(`${s.full_name}${s.role === "manager" ? " (Manager)" : ""}`);
+      lines.push(`  Logins: ${s.login_count} · Time in app: ${formatDuration(s.total_seconds)} · Modules completed: ${s.modules_complete}/10`);
+      lines.push(`  Last login: ${s.last_login ? new Date(s.last_login).toLocaleDateString() : "Never"}`);
+      lines.push("");
+    });
+    navigator.clipboard.writeText(lines.join("\n")).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    });
+  }
+  return /*#__PURE__*/React.createElement("div", {
+    style: {
+      ...styles.row,
+      marginTop: 12
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      justifyContent: "space-between",
+      alignItems: "center",
+      flexWrap: "wrap",
+      gap: 10
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    style: styles.restaurantName
+  }, "Monthly Report — ", restaurant.name), /*#__PURE__*/React.createElement("button", {
+    style: styles.textBtn,
+    onClick: onClose
+  }, "Back to restaurants")), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 10,
+      marginTop: 14,
+      alignItems: "flex-end",
+      flexWrap: "wrap"
+    }
+  }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("label", {
+    style: styles.label
+  }, "Month"), /*#__PURE__*/React.createElement("select", {
+    style: styles.input,
+    value: month,
+    onChange: e => setMonth(Number(e.target.value))
+  }, MONTH_NAMES.map((m, i) => /*#__PURE__*/React.createElement("option", {
+    key: i,
+    value: i + 1
+  }, m)))), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("label", {
+    style: styles.label
+  }, "Year"), /*#__PURE__*/React.createElement("input", {
+    style: {
+      ...styles.input,
+      width: 90
+    },
+    type: "number",
+    value: year,
+    onChange: e => setYear(Number(e.target.value))
+  })), /*#__PURE__*/React.createElement("button", {
+    style: styles.primaryBtn,
+    onClick: generate,
+    disabled: loading
+  }, loading ? "Loading..." : "Generate")), report && /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginTop: 18
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      background: COLORS.ivory,
+      borderRadius: 14,
+      padding: "18px 20px",
+      border: `1px solid #E3D8C5`
+    }
+  }, /*#__PURE__*/React.createElement("p", {
+    style: {
+      margin: 0,
+      fontFamily: "'Baloo 2', sans-serif",
+      fontWeight: 700,
+      fontSize: "1.1rem",
+      color: COLORS.espresso
+    }
+  }, "📊 ", report.restaurant_name, " — Training Report"), /*#__PURE__*/React.createElement("p", {
+    style: {
+      margin: "2px 0 16px",
+      color: COLORS.stone,
+      fontSize: "0.9rem"
+    }
+  }, MONTH_NAMES[report.month - 1], " ", report.year), report.staff.length === 0 && /*#__PURE__*/React.createElement("p", {
+    style: {
+      color: COLORS.stone
+    }
+  }, "No staff records yet."), report.staff.map(s => /*#__PURE__*/React.createElement("div", {
+    key: s.staff_id,
+    style: {
+      padding: "10px 0",
+      borderTop: `1px solid #E3D8C5`
+    }
+  }, /*#__PURE__*/React.createElement("p", {
+    style: {
+      margin: 0,
+      fontWeight: 700,
+      color: COLORS.espresso
+    }
+  }, s.full_name, s.role === "manager" ? " (Manager)" : ""), /*#__PURE__*/React.createElement("p", {
+    style: {
+      margin: "2px 0 0",
+      fontSize: "0.88rem",
+      color: COLORS.stone
+    }
+  }, "Logins: ", s.login_count, " · Time in app: ", formatDuration(s.total_seconds), " · Modules completed: ", s.modules_complete, "/10"), /*#__PURE__*/React.createElement("p", {
+    style: {
+      margin: "2px 0 0",
+      fontSize: "0.82rem",
+      color: COLORS.tan
+    }
+  }, "Last login: ", s.last_login ? new Date(s.last_login).toLocaleDateString() : "Never")))), /*#__PURE__*/React.createElement("button", {
+    style: {
+      ...styles.primaryBtn,
+      marginTop: 14
+    },
+    onClick: copyAsText
+  }, copied ? "Copied ✓" : "Copy as text (for WhatsApp)")));
+}
+function Dashboard({
+  owner,
+  onLogout
+}) {
+  const [restaurants, setRestaurants] = React.useState(null);
+  const [error, setError] = React.useState("");
+  const [showAdd, setShowAdd] = React.useState(false);
+  const [newName, setNewName] = React.useState("");
+  const [newAppName, setNewAppName] = React.useState("Karibu Academy");
+  const [managerName, setManagerName] = React.useState("");
+  const [managerPin, setManagerPin] = React.useState("");
+  const [adding, setAdding] = React.useState(false);
+  const [createdLink, setCreatedLink] = React.useState(null); // { restaurantId, managerName, managerPin, url }, memory only
+  const [reportFor, setReportFor] = React.useState(null); // restaurant object, or null
+
+  async function load() {
+    const {
+      data,
+      error: rpcError
+    } = await callRpc("owner_list_restaurants", {});
+    if (rpcError) {
+      setError("Couldn't load restaurants.");
+      return;
+    }
+    setRestaurants(data);
+  }
+  React.useEffect(() => {
+    load();
+  }, []);
+  async function handleAddRestaurant(e) {
+    e.preventDefault();
+    if (!newName.trim() || !managerName.trim() || managerPin.length !== 4) {
+      setError("Please fill in the restaurant name, manager name, and a 4-digit manager PIN.");
+      return;
+    }
+    setAdding(true);
+    setError("");
+    const {
+      data,
+      error: rpcError
+    } = await callRpc("owner_create_restaurant", {
+      p_name: newName.trim(),
+      p_app_name: newAppName.trim() || "Karibu Academy",
+      p_manager_name: managerName.trim(),
+      p_manager_pin: managerPin
+    });
+    setAdding(false);
+    if (rpcError || !data?.success) {
+      setError("Couldn't add that restaurant. " + (data?.error === "pin_must_be_4_digits" ? "PIN must be 4 digits." : ""));
+      return;
+    }
+    const staffUrl = await staffAppUrl(newName.trim(), data.restaurant_id);
+    setCreatedLink({
+      restaurantId: data.restaurant_id,
+      managerName: managerName.trim(),
+      managerPin,
+      url: staffUrl
+    });
+    setNewName("");
+    setNewAppName("Karibu Academy");
+    setManagerName("");
+    setManagerPin("");
+    setShowAdd(false);
+    load();
+  }
+  function handleDeletedRestaurant(deletedId) {
+    setRestaurants(prev => prev.filter(x => x.id !== deletedId));
+    setReportFor(current => current?.id === deletedId ? null : current);
+    setCreatedLink(current => current?.restaurantId === deletedId ? null : current);
+  }
+  return /*#__PURE__*/React.createElement("div", {
+    style: styles.page
+  }, /*#__PURE__*/React.createElement("div", {
+    style: styles.dashboardWrap
+  }, /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      justifyContent: "space-between",
+      alignItems: "flex-start",
+      marginBottom: 24
+    }
+  }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("span", {
+    style: styles.eyebrow
+  }, "KARIBU ACADEMY"), /*#__PURE__*/React.createElement("h1", {
+    style: styles.title
+  }, "Owner Console"), /*#__PURE__*/React.createElement("p", {
+    style: styles.subtitle
+  }, "Signed in as ", owner.fullName)), /*#__PURE__*/React.createElement("button", {
+    onClick: onLogout,
+    style: styles.textBtn
+  }, "Sign out")), error && /*#__PURE__*/React.createElement("div", {
+    style: styles.errorBox
+  }, error), createdLink && /*#__PURE__*/React.createElement("div", {
+    style: {
+      ...styles.row,
+      background: COLORS.avocadoLight,
+      borderColor: COLORS.avocado,
+      marginBottom: 16
+    }
+  }, /*#__PURE__*/React.createElement("p", {
+    style: {
+      margin: 0,
+      fontWeight: 700,
+      color: COLORS.avocado
+    }
+  }, "Restaurant created!"), /*#__PURE__*/React.createElement("p", {
+    style: {
+      margin: "8px 0 0",
+      fontSize: "0.9rem",
+      color: COLORS.espresso
+    }
+  }, "Give this restaurant's staff app link to their manager:"), /*#__PURE__*/React.createElement("a", {
+    href: createdLink.url,
+    target: "_blank",
+    rel: "noreferrer",
+    style: {
+      display: "block",
+      background: "#fff",
+      padding: "8px 12px",
+      borderRadius: 8,
+      marginTop: 6,
+      fontSize: "0.85rem",
+      wordBreak: "break-all"
+    }
+  }, createdLink.url), /*#__PURE__*/React.createElement("p", {
+    style: {
+      margin: "8px 0 0",
+      fontSize: "0.9rem"
+    }
+  }, "First manager login: ", /*#__PURE__*/React.createElement("strong", null, createdLink.managerName), " / PIN ", /*#__PURE__*/React.createElement("strong", null, createdLink.managerPin)), /*#__PURE__*/React.createElement("p", {
+    style: {
+      margin: "8px 0 0",
+      fontSize: "0.8rem",
+      color: COLORS.stone
+    }
+  }, /*#__PURE__*/React.createElement("button", {
+    style: styles.textBtn,
+    onClick: () => setCreatedLink(null)
+  }, "Dismiss"))), !restaurants && !error && /*#__PURE__*/React.createElement("p", {
+    style: {
+      color: COLORS.stone
+    }
+  }, "Loading restaurants..."), restaurants && /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      flexDirection: "column",
+      gap: 16
+    }
+  }, restaurants.map(r => /*#__PURE__*/React.createElement("div", {
+    key: r.id
+  }, /*#__PURE__*/React.createElement(RestaurantRow, {
+    r: r,
+    onDeleted: handleDeletedRestaurant
+  }), reportFor?.id === r.id ? /*#__PURE__*/React.createElement(MonthlyReport, {
+    restaurant: r,
+    onClose: () => setReportFor(null)
+  }) : /*#__PURE__*/React.createElement("button", {
+    style: {
+      ...styles.textBtn,
+      marginTop: 8
+    },
+    onClick: () => setReportFor(r)
+  }, "View monthly report →"))), !showAdd && /*#__PURE__*/React.createElement("button", {
+    style: {
+      ...styles.primaryBtn,
+      alignSelf: "flex-start"
+    },
+    onClick: () => setShowAdd(true)
+  }, "+ Add restaurant"), showAdd && /*#__PURE__*/React.createElement("form", {
+    onSubmit: handleAddRestaurant,
+    style: {
+      ...styles.row,
+      display: "flex",
+      flexDirection: "column",
+      gap: 12
+    }
+  }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("label", {
+    style: styles.label
+  }, "Restaurant name"), /*#__PURE__*/React.createElement("input", {
+    style: styles.input,
+    value: newName,
+    onChange: e => setNewName(e.target.value),
+    placeholder: "e.g. Savannah Grill",
+    autoFocus: true
+  })), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("label", {
+    style: styles.label
+  }, "App name (shown in their training app)"), /*#__PURE__*/React.createElement("input", {
+    style: styles.input,
+    value: newAppName,
+    onChange: e => setNewAppName(e.target.value),
+    placeholder: "e.g. Karibu Academy"
+  })), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("label", {
+    style: styles.label
+  }, "First manager's name"), /*#__PURE__*/React.createElement("input", {
+    style: styles.input,
+    value: managerName,
+    onChange: e => setManagerName(e.target.value),
+    placeholder: "e.g. Grace Mwangi"
+  })), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("label", {
+    style: styles.label
+  }, "Manager's 4-digit PIN"), /*#__PURE__*/React.createElement("input", {
+    style: styles.input,
+    value: managerPin,
+    onChange: e => setManagerPin(e.target.value.replace(/\D/g, "").slice(0, 4)),
+    placeholder: "••••",
+    inputMode: "numeric"
+  })), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: "flex",
+      gap: 10
+    }
+  }, /*#__PURE__*/React.createElement("button", {
+    style: styles.primaryBtn,
+    type: "submit",
+    disabled: adding
+  }, adding ? "Creating..." : "Create restaurant"), /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    style: styles.textBtn,
+    onClick: () => setShowAdd(false)
+  }, "Cancel"))))));
+}
+function App() {
+  const [owner, setOwner] = React.useState(null);
+  async function handleLogout() {
+    await callRpc("revoke_token", {});
+    try { localStorage.removeItem(AUTH_TOKEN_KEY); } catch (_) {}
+    setOwner(null);
+  }
+  return /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("style", null, fontImport), owner ? /*#__PURE__*/React.createElement(Dashboard, {
+    owner: owner,
+    onLogout: handleLogout
+  }) : /*#__PURE__*/React.createElement(Login, {
+    onLoggedIn: setOwner
+  }));
+}
+
+// =====================================================================
+// STYLES
+// =====================================================================
+const fontImport = `
+@import url('https://fonts.googleapis.com/css2?family=Baloo+2:wght@600;700;800&family=Inter:wght@400;500;600&display=swap');
+`;
+const styles = {
+  page: {
+    minHeight: "100vh",
+    background: COLORS.ivory,
+    fontFamily: "'Inter', sans-serif",
+    padding: "40px 20px",
+    boxSizing: "border-box"
+  },
+  loginCard: {
+    maxWidth: 380,
+    margin: "60px auto",
+    background: "#fff",
+    borderRadius: 20,
+    padding: "32px 28px",
+    border: `1px solid #E3D8C5`,
+    boxShadow: "0 10px 30px rgba(43,36,32,0.08)"
+  },
+  dashboardWrap: {
+    maxWidth: 720,
+    margin: "0 auto"
+  },
+  eyebrow: {
+    color: COLORS.marigoldDeep,
+    fontFamily: "'Baloo 2', sans-serif",
+    fontWeight: 700,
+    fontSize: "0.75rem",
+    letterSpacing: "0.14em"
+  },
+  title: {
+    fontFamily: "'Baloo 2', sans-serif",
+    fontWeight: 800,
+    fontSize: "1.8rem",
+    color: COLORS.espresso,
+    margin: "6px 0 4px"
+  },
+  subtitle: {
+    color: COLORS.stone,
+    fontSize: "0.95rem",
+    margin: 0
+  },
+  label: {
+    display: "block",
+    fontSize: "0.8rem",
+    fontWeight: 600,
+    color: COLORS.avocado,
+    marginBottom: 6
+  },
+  input: {
+    width: "100%",
+    padding: "12px 14px",
+    borderRadius: 12,
+    border: "1.5px solid #E3D8C5",
+    fontSize: "1rem",
+    fontFamily: "'Inter', sans-serif",
+    boxSizing: "border-box"
+  },
+  primaryBtn: {
+    background: COLORS.marigold,
+    color: COLORS.espresso,
+    border: "none",
+    borderRadius: 12,
+    padding: "12px 20px",
+    fontFamily: "'Baloo 2', sans-serif",
+    fontWeight: 700,
+    fontSize: "0.95rem",
+    cursor: "pointer"
+  },
+  textBtn: {
+    background: "none",
+    border: "none",
+    color: COLORS.stone,
+    fontSize: "0.85rem",
+    cursor: "pointer"
+  },
+  errorBox: {
+    background: COLORS.clayLight,
+    color: "#5A2A24",
+    borderRadius: 10,
+    padding: "10px 14px",
+    fontSize: "0.9rem"
+  },
+  row: {
+    background: "#fff",
+    border: "1px solid #E3D8C5",
+    borderRadius: 16,
+    padding: "18px 20px"
+  },
+  restaurantName: {
+    fontFamily: "'Baloo 2', sans-serif",
+    fontWeight: 700,
+    fontSize: "1.1rem",
+    color: COLORS.espresso
+  },
+  restaurantNameInput: {
+    fontFamily: "'Baloo 2', sans-serif",
+    fontWeight: 700,
+    fontSize: "1.1rem",
+    color: COLORS.espresso,
+    width: "auto",
+    flex: 1,
+    minWidth: 160,
+    border: "1.5px solid transparent",
+    padding: "6px 10px"
+  },
+  badge: {
+    fontFamily: "'Baloo 2', sans-serif",
+    fontWeight: 700,
+    fontSize: "0.75rem",
+    padding: "4px 12px",
+    borderRadius: 999
+  },
+  statusOption: {
+    padding: "6px 14px",
+    borderRadius: 999,
+    border: "1.5px solid #E3D8C5",
+    background: "#fff",
+    color: COLORS.stone,
+    fontSize: "0.82rem",
+    fontWeight: 600,
+    cursor: "pointer"
+  }
+};
+
+ReactDOM.createRoot(document.getElementById("root")).render(React.createElement(App));
+</script>
+</body>
+</html>

@@ -1,0 +1,8 @@
+node_modules/
+.netlify/
+runtime-config.js
+.env
+.env.*
+!.env.example
+supabase/.temp/
+

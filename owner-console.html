@@ -210,6 +210,7 @@ function RestaurantRow({
   const [deleting, setDeleting] = React.useState(false);
   const dirty = name !== r.name || appName !== (r.app_name || "Karibu Academy") || status !== r.payment_status || note !== (r.payment_note || "");
   const meta = STATUS_META[status] || STATUS_META.active;
+  const staffUrl = r.slug ? `${window.location.origin}/${r.slug}` : `${window.location.origin}/training?r=${r.id}`;
   async function handleSave() {
     setSaving(true);
     setSaved(false);
@@ -271,9 +272,18 @@ function RestaurantRow({
     style: {
       ...styles.badge,
       color: meta.color,
-      background: meta.bg
+    background: meta.bg
+  }
+  }, meta.label)), /*#__PURE__*/React.createElement("a", {
+    href: staffUrl,
+    target: "_blank",
+    rel: "noreferrer",
+    style: {
+      ...styles.textBtn,
+      color: COLORS.avocado,
+      textDecoration: "none"
     }
-  }, meta.label)), /*#__PURE__*/React.createElement("div", {
+  }, "Open training app ↗")), /*#__PURE__*/React.createElement("div", {
     style: {
       marginTop: 12
     }
@@ -375,7 +385,7 @@ function RestaurantRow({
       setConfirmingDelete(false);
       setConfirmText("");
     }
-  }, "Cancel")))));
+  }, "Cancel"))));
 }
 const MONTH_NAMES = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
 function formatDuration(totalSeconds) {

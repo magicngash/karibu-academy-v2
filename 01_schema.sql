@@ -43,8 +43,7 @@ create table if not exists public.staff (
 );
 
 create index if not exists staff_restaurant_idx on public.staff (restaurant_id);
-drop index if exists public.staff_name_ci_idx;
-create unique index staff_restaurant_name_ci_unique_idx
+create unique index if not exists staff_restaurant_name_ci_unique_idx
   on public.staff (restaurant_id, lower(btrim(full_name)));
 
 create table if not exists public.module_progress (

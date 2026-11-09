@@ -38,7 +38,7 @@ let RESTAURANT_ROUTE_ERROR = "";
 // Plain fetch-based RPC helper — no external SDK/script tag required,
 // so this works both in a live artifact preview and as standalone HTML.
 async function callRpc(name, params) {
-  const loginRpc = name === "staff_login" || name === "owner_login";
+  const loginRpc = name === "staff_login" || name === "owner_login" || name === "get_restaurant_by_slug";
   const authToken = loginRpc ? null : (() => {
     try { return localStorage.getItem(AUTH_TOKEN_KEY); } catch (_) { return null; }
   })();
@@ -596,6 +596,136 @@ const LEGACY_MODULE_DATA = {
 // The uploaded curriculum is the source of truth for training content.
 const MODULE_DATA = window.TRAINING_MODULE_DATA;
 
+const OPEN_ENDED_QUESTIONS = {
+  1: [
+    "What information should you establish from a guest before proceeding with the seating process?",
+    "Explain how you would maintain awareness of the entrance while moving between different workstations.",
+    "How would you distinguish between a guest who needs immediate assistance and one who is comfortable waiting briefly?",
+    "Why should staff maintain consistent standards of professional presence throughout a shift, including during quiet periods?",
+    "Describe how you would manage a situation where a returning guest expects to be recognised, but you cannot remember their name."
+  ],
+  2: [
+    "What preparations should service staff undertake before a shift to familiarise themselves with the day's menu and available specials?",
+    "Explain why staff should understand portion sizes and available substitutions when advising guests.",
+    "How would you handle a situation where a guest requests a menu modification that the kitchen may not routinely provide?",
+    "What considerations should guide your response when a guest asks about the suitability of a dish for a vegetarian diet?",
+    "Explain how knowledge of preparation methods and ingredient quality can help guests appreciate the establishment's products."
+  ],
+  3: [
+    "How would you adjust your recommendations when serving a first-time guest compared with a regular guest?",
+    "Explain why understanding the characteristics of the products offered is important when making recommendations.",
+    "Describe how you would introduce a new or seasonal product to a guest who is unfamiliar with it.",
+    "What factors would you consider when deciding whether to recommend a premium alternative to a guest?",
+    "How can staff use their knowledge of product combinations to increase sales while improving the guest's experience?"
+  ],
+  4: [
+    "Describe the precautions you should take when carrying and serving food or drinks to guests.",
+    "Explain how you would clear a table without disturbing guests or interfering with their dining experience.",
+    "What factors should you consider when deciding the appropriate time to approach a table during a meal?",
+    "Describe how you would coordinate the delivery of food and drinks when several orders for the same table are ready at different times.",
+    "What procedures would you follow to ensure that a table is properly prepared for the next guest after the previous guests leave?"
+  ],
+  5: [
+    "Describe the precautions you should observe when handling cash received from a guest and returning change.",
+    "What steps would you follow when processing a card payment to ensure that the transaction is completed correctly?",
+    "How would you handle a situation where a guest disputes an amount appearing on their bill?",
+    "Apart from providing a waiting-time estimate, what can staff do to make waiting guests more comfortable?",
+    "Why should staff maintain accuracy and transparency when handling bills, payment records and service charges?"
+  ],
+  6: [
+    "After resolving a guest's complaint, how would you establish whether the corrective action has addressed the guest's concern?",
+    "Describe how you would handle a complaint arising from circumstances beyond the establishment's direct control.",
+    "What can staff learn from repeated customer complaints, and how should this information be used?",
+    "Explain the difference between apologising for a problem and taking responsibility for resolving it.",
+    "How would you maintain professional composure if a guest continues to express dissatisfaction even after a reasonable solution has been offered?"
+  ],
+  7: [
+    "Explain how using clear and concise language can reduce misunderstandings during customer interactions.",
+    "How would you communicate an operational limitation to a guest while maintaining a positive and helpful approach?",
+    "Describe how you would adapt your communication when dealing with a guest who has difficulty understanding the information being provided.",
+    "Why should staff avoid using technical terms, slang or ambiguous expressions when communicating with guests?",
+    "Give an example of how you would use both verbal and non-verbal communication to reassure a guest who appears uncertain about a service."
+  ],
+  8: [
+    "How would you adapt your service approach when dealing with a guest who prefers minimal interaction compared with one who enjoys conversation?",
+    "Explain how recognising signs of stress or disappointment can help prevent a minor concern from developing into a complaint.",
+    "What does building trust through empathy mean in practical customer service situations?",
+    "Describe how you would respond to a guest who is disappointed but has not clearly explained the reason.",
+    "Why is it important to separate a guest's emotional reaction from your personal feelings when providing service?"
+  ],
+  9: [
+    "What key information should be included in a shift handover to ensure that the incoming team can continue operations effectively?",
+    "Explain how poor communication between staff members can affect the quality and consistency of customer service.",
+    "Describe how you would take responsibility for a mistake that affects another department's work.",
+    "What circumstances should prompt you to report an operational concern through the established organisational reporting structure?",
+    "How can staff create a working environment in which colleagues feel comfortable asking for and offering assistance?"
+  ],
+  10: [
+    "What should be included in a pre-shift readiness check before an employee begins serving guests?",
+    "Explain how a properly organised workstation contributes to staff efficiency and service consistency.",
+    "Why should service quality checks be conducted before food or drinks are delivered to guests?",
+    "Describe how you would use a personal performance checklist to identify areas requiring improvement after a shift.",
+    "How can supervisors and employees work together to ensure that service standards are maintained consistently across different shifts?"
+  ]
+};
+
+Object.entries(OPEN_ENDED_QUESTIONS).forEach(([moduleId, questions]) => {
+  if (MODULE_DATA[moduleId]) {
+    MODULE_DATA[moduleId].quiz = [
+      ...MODULE_DATA[moduleId].quiz,
+      ...questions.map(q => ({ type: "shortAnswer", q }))
+    ];
+  }
+});
+const getAutoGradedTotal = moduleData => moduleData.quiz.filter(question => question.type !== "shortAnswer").length;
+const MODULE_1_REVIEW = [
+  {
+    q: OPEN_ENDED_QUESTIONS[1][0],
+    rubric: "Award 2/2 for party size, reservation details, seating preference, and any accessibility or dietary information. Award 1/2 for two relevant items. Award 0/2 for an unsafe or incomplete response.",
+    sample: "I would confirm the number of guests, whether they have a reservation, their preferred seating, and any accessibility or important service needs before seating them."
+  },
+  {
+    q: OPEN_ENDED_QUESTIONS[1][1],
+    rubric: "Award 2/2 for regularly scanning the entrance while moving, making eye contact or smiling at arrivals, and finishing the current task before greeting properly. Award 1/2 for only one or two of these actions. Award 0/2 for ignoring the entrance.",
+    sample: "I would glance toward the entrance whenever I move between stations, acknowledge new guests with eye contact and a smile, then finish my current task and greet them as soon as possible."
+  },
+  {
+    q: OPEN_ENDED_QUESTIONS[1][2],
+    rubric: "Award 2/2 for using visible cues such as urgency, facial expression, pace, or repeated attempts to get help, and responding efficiently without neglecting others. Award 1/2 for identifying urgency without explaining how to respond. Award 0/2 for treating every guest the same or ignoring cues.",
+    sample: "A guest checking the time, looking around repeatedly, or signalling for help needs prompt, direct assistance. A relaxed guest who is settled and not seeking help can wait briefly after being acknowledged."
+  },
+  {
+    q: OPEN_ENDED_QUESTIONS[1][3],
+    rubric: "Award 2/2 for explaining that professional presence protects consistency, guest trust, and service quality even when quiet. Award 1/2 for mentioning appearance or professionalism without the guest-experience reason. Award 0/2 for treating quiet periods as an excuse to lower standards.",
+    sample: "Guests notice standards at every moment, not only during busy periods. Consistent posture, grooming, attentiveness, and readiness maintain trust and make the team prepared when service becomes busy again."
+  },
+  {
+    q: OPEN_ENDED_QUESTIONS[1][4],
+    rubric: "Award 2/2 for welcoming the returning guest warmly, avoiding a false name, asking discreetly or checking an approved record, and continuing to provide personal service. Award 1/2 for being honest and warm but offering no practical next step. Award 0/2 for pretending or embarrassing the guest.",
+    sample: "I would welcome the guest warmly without guessing their name, then discreetly check the reservation or ask a colleague. I would continue the conversation naturally and use their name once I have confirmed it."
+  }
+];
+
+// Local AI-assist prototype for the pilot review. Each criterion is checked
+// against the learner's wording and produces a suggested 0-2 score. The
+// trainer remains the final decision-maker.
+const scoreModule1Answer = (answer, item) => {
+  const text = String(answer || "").toLowerCase();
+  if (!text.trim()) return { score: null, feedback: "No answer was submitted." };
+  const criteria = [
+    ["party|number|guests|people", "reservation|booking", "seating|table", "accessib|dietary|needs"],
+    ["scan|glance|look|watch|entrance|door", "eye contact|smile|acknowledge|greet", "finish|current task|busy"],
+    ["urgent|urgency|rushed|time|signal|help|look around", "prompt|quick|immediate|direct", "wait|comfortable|relaxed|acknowledge"],
+    ["consistent|standards|professional|presence|posture|groom|attent", "trust|confidence|quality|guest experience", "quiet|busy|ready|prepared"],
+    ["welcome|warm|returning|recogn", "ask|check|colleague|reservation|record|confirm", "honest|guess|pretend|discreet|naturally"]
+  ];
+  const groups = criteria[MODULE_1_REVIEW.indexOf(item)] || [];
+  const hits = groups.filter(group => group.split("|").some(term => text.includes(term))).length;
+  const score = hits >= Math.max(2, groups.length - 1) ? 2 : hits >= 1 ? 1 : 0;
+  const feedback = score === 2 ? "The response addresses the main rubric points." : score === 1 ? "The response shows some relevant understanding but misses important rubric points." : "The response does not yet demonstrate the key rubric points.";
+  return { score, feedback };
+};
+
 // =====================================================================
 // MODULE DIRECTORY (for the home dashboard)
 // =====================================================================
@@ -886,6 +1016,7 @@ function Icon({
 // =====================================================================
 function ModuleFlow({
   moduleData,
+  session,
   onExit,
   onFinish,
   resumeKey,
@@ -902,6 +1033,14 @@ function ModuleFlow({
   const [step, setStep] = React.useState(() => savedProgress?.step || 0); // 0 = course landing page
   const [selected, setSelected] = React.useState(null);
   const [answers, setAnswers] = React.useState(() => savedProgress?.answers || []);
+  const writtenKey = resumeKey ? resumeKey.replace("karibu-training:", "karibu-written:") : null;
+  const [writtenResponses, setWrittenResponses] = React.useState(() => {
+    try {
+      return writtenKey ? JSON.parse(localStorage.getItem(writtenKey) || "null")?.responses || [] : [];
+    } catch (_) {
+      return [];
+    }
+  });
   const screenRef = React.useRef(null);
   const {
     lessons,
@@ -914,7 +1053,7 @@ function ModuleFlow({
   const quizIndex = step - quizStartIndex;
   const inQuiz = quizIndex >= 0 && quizIndex < quiz.length;
   const isComplete = step === TOTAL_STEPS - 1;
-  const score = answers.filter(Boolean).length;
+  const score = answers.filter((answer, index) => quiz[index]?.type !== "shortAnswer" && answer === true).length;
   const progressPct = Math.round(step / (TOTAL_STEPS - 1) * 100);
   React.useEffect(() => {
     if (screenRef.current) screenRef.current.scrollTop = 0;
@@ -949,6 +1088,35 @@ function ModuleFlow({
       return copy;
     });
   }
+  function submitShortAnswer(response) {
+    const shortIndex = quiz.slice(0, quizIndex + 1).filter(question => question.type === "shortAnswer").length - 1;
+    const moduleId = Number(resumeKey?.split(":").pop());
+    const nextWrittenResponses = [...writtenResponses];
+    nextWrittenResponses[shortIndex] = response;
+    setWrittenResponses(nextWrittenResponses);
+    if (writtenKey) {
+      localStorage.setItem(writtenKey, JSON.stringify({
+        responses: nextWrittenResponses,
+        updatedAt: Date.now()
+      }));
+    }
+    if (session?.staffId && Number.isInteger(moduleId)) {
+      callRpc("save_written_answer", {
+        p_staff_id: session.staffId,
+        p_module_id: moduleId,
+        p_question_index: shortIndex,
+        p_answer: response
+      }).then(result => {
+        if (result.error || !result.data?.success) console.warn("Written answer was saved locally but not to Supabase.", result.error || result.data);
+      });
+    }
+    setAnswers(a => {
+      const copy = [...a];
+      copy[quizIndex] = response;
+      return copy;
+    });
+  }
+  const currentShortIndex = inQuiz && quiz[quizIndex]?.type === "shortAnswer" ? quiz.slice(0, quizIndex + 1).filter(question => question.type === "shortAnswer").length - 1 : -1;
   return /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
     style: styles.topBar
   }, /*#__PURE__*/React.createElement("button", {
@@ -999,10 +1167,13 @@ function ModuleFlow({
     count: quiz.length,
     selected: selected,
     onSelect: selectAnswer,
+    answer: writtenResponses[currentShortIndex],
+    onSubmitShortAnswer: submitShortAnswer,
     onNext: next
   }), isComplete && /*#__PURE__*/React.createElement(Complete, {
     score: score,
-    total: quiz.length,
+    total: getAutoGradedTotal(moduleData),
+    writtenTotal: quiz.length - getAutoGradedTotal(moduleData),
     badgeTitle: moduleData.badgeTitle,
     onDone: onExit
   }), step > 0 && !isComplete && /*#__PURE__*/React.createElement("button", {
@@ -1240,9 +1411,21 @@ function QuizCard({
   index,
   count,
   selected,
+  answer,
   onSelect,
+  onSubmitShortAnswer,
   onNext
 }) {
+  if (data.type === "shortAnswer") {
+    return /*#__PURE__*/React.createElement(ShortAnswerCard, {
+      data: data,
+      index: index,
+      count: count,
+      answer: answer,
+      onSubmit: onSubmitShortAnswer,
+      onNext: onNext
+    });
+  }
   const answered = selected !== null;
   const isCorrect = answered && data.options[selected].correct;
   return /*#__PURE__*/React.createElement("div", {
@@ -1301,9 +1484,74 @@ function QuizCard({
     className: "icon-sm"
   })));
 }
+function ShortAnswerCard({
+  data,
+  index,
+  count,
+  answer,
+  onSubmit,
+  onNext
+}) {
+  const [draft, setDraft] = React.useState(answer || "");
+  const submitted = typeof answer === "string";
+  function submit() {
+    const response = draft.trim();
+    if (!response || submitted) return;
+    onSubmit(response);
+  }
+  return /*#__PURE__*/React.createElement("div", {
+    style: styles.cardWrap
+  }, /*#__PURE__*/React.createElement("span", {
+    style: styles.tag
+  }, "Question ", index + 1, " of ", count), /*#__PURE__*/React.createElement("h2", {
+    style: {
+      ...styles.cardTitle,
+      fontSize: "1.15rem"
+    }
+  }, data.q), /*#__PURE__*/React.createElement("p", {
+    style: styles.shortAnswerHint
+  }, "Write a brief answer in your own words."), /*#__PURE__*/React.createElement("textarea", {
+    value: draft,
+    onChange: event => setDraft(event.target.value),
+    onInput: event => {
+      event.currentTarget.style.height = "auto";
+      event.currentTarget.style.height = `${event.currentTarget.scrollHeight}px`;
+    },
+    disabled: submitted,
+    placeholder: "Type your answer here...",
+    "aria-label": "Short answer",
+    style: styles.shortAnswerInput
+  }), !submitted && /*#__PURE__*/React.createElement("button", {
+    style: {
+      ...styles.primaryBtn,
+      opacity: draft.trim() ? 1 : 0.55
+    },
+    onClick: submit,
+    disabled: !draft.trim()
+  }, "Save response ", /*#__PURE__*/React.createElement(Icon, {
+    name: "arrow",
+    className: "icon-sm"
+  })), submitted && /*#__PURE__*/React.createElement("div", {
+    style: {
+      ...styles.feedbackBox,
+      ...styles.feedbackGood
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    style: styles.feedbackHeading
+  }, "Response saved"), /*#__PURE__*/React.createElement("p", {
+    style: styles.feedbackText
+  }, "Your written response has been recorded for discussion or review.")), submitted && /*#__PURE__*/React.createElement("button", {
+    style: styles.primaryBtn,
+    onClick: onNext
+  }, index === count - 1 ? "Finish module" : "Next question", " ", /*#__PURE__*/React.createElement(Icon, {
+    name: "arrow",
+    className: "icon-sm"
+  })));
+}
 function Complete({
   score,
   total,
+  writtenTotal,
   badgeTitle,
   onDone
 }) {
@@ -1325,7 +1573,7 @@ function Complete({
     }
   }, badgeTitle), /*#__PURE__*/React.createElement("p", {
     style: styles.coverSub
-  }, "You scored ", score, " out of ", total, " on the quiz. Module complete — great work."), /*#__PURE__*/React.createElement("div", {
+  }, "You scored ", score, " out of ", total, " on the multiple-choice quiz. You also completed ", writtenTotal, " written responses. Module complete — great work."), /*#__PURE__*/React.createElement("div", {
     style: styles.scoreBox
   }, /*#__PURE__*/React.createElement("span", {
     style: styles.scoreNum
@@ -1829,7 +2077,8 @@ function ManagerDashboard({
     });
     setSaving(false);
     if (rpcError || !data.success) {
-      setError(data?.error === "name_taken" ? "That name is already in use." : "Couldn't add that staff member.");
+      const detail = data?.error || rpcError?.message || "unknown_error";
+      setError(detail === "name_taken" ? "That name is already in use." : `Couldn't add that staff member (${detail}).`);
       return;
     }
     setNewName("");
@@ -1887,6 +2136,108 @@ function ManagerDashboard({
   const selectedAverageScore = selectedScores.length ? Math.round(selectedScores.reduce((sum, r) => sum + Number(r.quiz_score) / Number(r.quiz_total) * 100, 0) / selectedScores.length) : null;
   const selectedDone = selectedStaff ? MODULES.filter(m => selectedStaff.byModule[m.id] === "complete").length : 0;
   const selectedLastActive = selectedRecords.map(r => r.updated_at || r.completed_at || r.last_active_at || r.created_at).filter(Boolean).sort().pop();
+  const [selectedModule1Answers, setSelectedModule1Answers] = React.useState([]);
+  const [selectedModule1Reviews, setSelectedModule1Reviews] = React.useState([]);
+  const [trainerDrafts, setTrainerDrafts] = React.useState({});
+  const [writtenAnswerError, setWrittenAnswerError] = React.useState("");
+  const [reviewBusy, setReviewBusy] = React.useState("");
+  React.useEffect(() => {
+    let active = true;
+    async function loadWrittenAnswers() {
+      setSelectedModule1Answers([]);
+      setSelectedModule1Reviews([]);
+      setTrainerDrafts({});
+      setWrittenAnswerError("");
+      if (!selectedStaff?.staff_id) return;
+      const { data, error: rpcError } = await callRpc("manager_written_answers", {
+        p_restaurant_id: RESTAURANT_ID,
+        p_staff_id: selectedStaff.staff_id,
+        p_module_id: 1
+      });
+      if (!active) return;
+      if (rpcError) {
+        setWrittenAnswerError(rpcError.message || "Could not load written answers.");
+        return;
+      }
+      const responses = [];
+      (data || []).forEach(item => { responses[item.question_index] = item.answer; });
+      setSelectedModule1Answers(responses);
+      setSelectedModule1Reviews(data || []);
+      const drafts = {};
+      (data || []).forEach(item => { drafts[item.question_index] = item.trainer_score == null ? "" : String(item.trainer_score); });
+      setTrainerDrafts(drafts);
+    }
+    loadWrittenAnswers();
+    return () => {
+      active = false;
+    };
+  }, [selectedStaff?.staff_id]);
+  async function runAiMark(questionIndex) {
+    const answer = selectedModule1Answers[questionIndex];
+    const item = MODULE_1_REVIEW[questionIndex];
+    if (!answer || !selectedStaff?.staff_id) return;
+    setReviewBusy(`ai-${questionIndex}`);
+    let result;
+    try {
+      const response = await fetch("/.netlify/functions/mark-written-answer", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ question: item.q, rubric: item.rubric, sample: item.sample, answer })
+      });
+      const body = await response.json().catch(() => null);
+      if (!response.ok) throw new Error(body?.details || body?.error || "Automatic system marking failed.");
+      result = body;
+    } catch (error) {
+      setReviewBusy("");
+      setWrittenAnswerError(error.message || "Could not run automatic system marking.");
+      return;
+    }
+    const { data, error: rpcError } = await callRpc("save_ai_written_answer", {
+      p_staff_id: selectedStaff.staff_id,
+      p_module_id: 1,
+      p_question_index: questionIndex,
+      p_ai_score: result.score,
+      p_ai_feedback: result.feedback
+    });
+    setReviewBusy("");
+    if (rpcError || !data?.success) {
+      setWrittenAnswerError(rpcError?.message || data?.error || "Could not save automatic system marking.");
+      return;
+    }
+    setSelectedModule1Reviews(previous => {
+      const next = [...previous];
+      next[questionIndex] = { ...(next[questionIndex] || {}), ai_score: result.score, ai_feedback: result.feedback };
+      return next;
+    });
+  }
+  async function saveTrainerMark(questionIndex, score, feedback) {
+    if (!selectedStaff?.staff_id) return;
+    setTrainerDrafts(previous => ({ ...previous, [questionIndex]: score === "" ? "" : String(score) }));
+    setReviewBusy(`trainer-${questionIndex}`);
+    const { data, error: rpcError } = await callRpc("review_written_answer", {
+      p_staff_id: selectedStaff.staff_id,
+      p_module_id: 1,
+      p_question_index: questionIndex,
+      p_trainer_score: score === "" ? null : Number(score),
+      p_trainer_feedback: feedback || null
+    });
+    setReviewBusy("");
+    if (rpcError || !data?.success) {
+      setWrittenAnswerError(rpcError?.message || data?.error || "Could not save trainer marking.");
+      return;
+    }
+    setSelectedModule1Reviews(previous => {
+      const next = [...previous];
+      next[questionIndex] = { ...(next[questionIndex] || {}), trainer_score: score === "" ? null : Number(score), trainer_feedback: feedback || null };
+      return next;
+    });
+  }
+  const selectedModule1Record = selectedStaff?.records?.[1] || {};
+  const selectedModule1McqScore = Number.isFinite(Number(selectedModule1Record.quiz_score)) ? Number(selectedModule1Record.quiz_score) : 0;
+  const selectedModule1McqTotal = Number(selectedModule1Record.quiz_total) > 0 ? Number(selectedModule1Record.quiz_total) : 0;
+  const selectedModule1WrittenScore = selectedModule1Reviews.reduce((sum, review) => sum + (review?.trainer_score != null ? Number(review.trainer_score) : review?.ai_score != null ? Number(review.ai_score) : 0), 0);
+  const selectedModule1OverallTotal = selectedModule1McqTotal + MODULE_1_REVIEW.length * 2;
+  const selectedModule1OverallScore = selectedModule1OverallTotal > 0 ? Math.round((selectedModule1McqScore + selectedModule1WrittenScore) / selectedModule1OverallTotal * 100) : null;
   return /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
     style: styles.topBar
   }, /*#__PURE__*/React.createElement("button", {
@@ -1951,7 +2302,14 @@ function ManagerDashboard({
     const record = selectedStaff.records[m.id] || {};
     const score = Number(record.quiz_total) > 0 && Number.isFinite(Number(record.quiz_score)) ? ` · ${record.quiz_score}/${record.quiz_total}` : "";
     return /*#__PURE__*/React.createElement("div", { key: m.id, style: { display: "flex", justifyContent: "space-between", gap: 8, alignItems: "center" } }, /*#__PURE__*/React.createElement("span", { style: styles.moduleCardBlurb }, `Module ${m.id} · ${m.title}`), /*#__PURE__*/React.createElement("span", { style: styles.moduleCardNum }, `${status.replace("_", " ")}${score}`));
-  }))), !rows && !error && /*#__PURE__*/React.createElement("p", {
+  }))), selectedStaff && /*#__PURE__*/React.createElement("div", {
+    style: { ...styles.syllabusBox, marginBottom: 16, border: `2px solid ${COLORS.avocado}` }
+  }, /*#__PURE__*/React.createElement("span", { style: styles.objLabel }, "Module 1 written-answer review"), /*#__PURE__*/React.createElement("p", {
+    style: { ...styles.moduleCardBlurb, margin: "6px 0 14px", lineHeight: 1.45 }
+  }, "Module 1 results for ", selectedStaff.full_name, ". Managers can view submitted answers and automatic system scores."), /*#__PURE__*/React.createElement("div", { style: { display: "flex", flexWrap: "wrap", gap: 12, margin: "10px 0 14px", padding: "10px 12px", background: "#F1E9DA", borderRadius: 10 } }, /*#__PURE__*/React.createElement("strong", null, "Overall Module 1: ", selectedModule1OverallScore === null ? "Not scored" : `${selectedModule1OverallScore}%`), /*#__PURE__*/React.createElement("span", { style: { color: COLORS.stone, fontSize: "0.85rem" } }, `MCQ ${selectedModule1McqScore}/${selectedModule1McqTotal || "—"} · Written ${selectedModule1WrittenScore}/${MODULE_1_REVIEW.length * 2}`), /*#__PURE__*/React.createElement("span", { style: { color: selectedModule1OverallScore !== null && selectedModule1OverallScore >= 80 ? COLORS.avocado : COLORS.stone, fontWeight: 700 } }, selectedModule1OverallScore !== null ? selectedModule1OverallScore >= 80 ? "Passed" : "Not passed" : "Awaiting marking")), writtenAnswerError && /*#__PURE__*/React.createElement("p", { style: { ...styles.feedbackText, color: COLORS.chili } }, "Answer storage: ", writtenAnswerError), MODULE_1_REVIEW.map((item, questionIndex) => /*#__PURE__*/React.createElement("div", {
+    key: item.q,
+     style: { borderTop: questionIndex ? "1px solid #E3D8C5" : "none", paddingTop: questionIndex ? 16 : 0, marginTop: questionIndex ? 16 : 0 }
+  }, /*#__PURE__*/React.createElement("span", { style: styles.moduleCardTitle }, "Question ", questionIndex + 1), /*#__PURE__*/React.createElement("p", { style: { ...styles.bodyText, margin: "6px 0" } }, item.q), /*#__PURE__*/React.createElement("div", { style: { marginTop: 8, fontSize: "0.9rem", color: COLORS.stone } }, /*#__PURE__*/React.createElement("strong", null, "Staff answer: "), selectedModule1Answers[questionIndex] || "No submitted answer yet."), /*#__PURE__*/React.createElement("div", { style: { marginTop: 8, color: COLORS.stone, fontSize: "0.85rem" } }, /*#__PURE__*/React.createElement("strong", null, "Automatic system score: "), selectedModule1Reviews[questionIndex]?.ai_score == null ? "Not run" : `${selectedModule1Reviews[questionIndex].ai_score}/2`), selectedModule1Reviews[questionIndex]?.ai_feedback && /*#__PURE__*/React.createElement("div", { style: { marginTop: 6, color: COLORS.stone, fontSize: "0.85rem" } }, /*#__PURE__*/React.createElement("strong", null, "Feedback: "), selectedModule1Reviews[questionIndex].ai_feedback)), /*#__PURE__*/React.createElement("div", { style: { marginTop: 8, color: COLORS.stone, fontSize: "0.85rem" } }, /*#__PURE__*/React.createElement("strong", null, "Final score: "), selectedModule1Reviews[questionIndex]?.trainer_score != null ? `${selectedModule1Reviews[questionIndex].trainer_score}/2` : selectedModule1Reviews[questionIndex]?.ai_score != null ? `${selectedModule1Reviews[questionIndex].ai_score}/2` : "Not scored"))), !rows && !error && /*#__PURE__*/React.createElement("p", {
     style: styles.bodyText
   }, "Loading staff progress..."), rows && /*#__PURE__*/React.createElement("div", {
     style: {
@@ -2406,9 +2764,10 @@ function App() {
     onLogout: handleLogout
   }), screen === "module" && activeMod && MODULE_DATA[activeMod.id] && /*#__PURE__*/React.createElement(ModuleFlow, {
     moduleData: MODULE_DATA[activeMod.id],
+    session: session,
     onExit: exitToHome,
     resumeKey: `karibu-training:${RESTAURANT_ID}:${session?.staffId}:module:${activeMod.id}`,
-    onFinish: score => finishModule(activeMod.id, score, MODULE_DATA[activeMod.id].quiz.length),
+    onFinish: score => finishModule(activeMod.id, score, getAutoGradedTotal(MODULE_DATA[activeMod.id])),
     isManager: session?.role === "manager",
     onManagerDashboard: () => setScreen("manager-dashboard")
   }), screen === "coming-soon" && activeMod && /*#__PURE__*/React.createElement(ComingSoon, {
@@ -2948,6 +3307,29 @@ const styles = {
     fontFamily: "'Inter', sans-serif",
     width: "100%",
     boxSizing: "border-box"
+  },
+  shortAnswerHint: {
+    margin: "0 0 10px",
+    color: "#75695E",
+    fontSize: "0.95rem",
+    lineHeight: 1.5
+  },
+  shortAnswerInput: {
+    display: "block",
+    width: "100%",
+    minHeight: 180,
+    padding: "16px",
+    marginBottom: 14,
+    boxSizing: "border-box",
+    resize: "vertical",
+    overflow: "hidden",
+    borderRadius: 14,
+    border: "1.5px solid #E3D8C5",
+    background: "#fff",
+    color: "#2B2420",
+    fontSize: "1rem",
+    fontFamily: "'Inter', sans-serif",
+    lineHeight: 1.6
   },
   option: {
     display: "flex",

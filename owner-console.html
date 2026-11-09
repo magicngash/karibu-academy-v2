@@ -44,6 +44,14 @@ async function staffAppUrl(name, restaurantId) {
   return `${window.location.origin}/${slug}`;
 }
 
+function trainingUrlForRestaurant(restaurant) {
+  if (!restaurant?.slug) return null;
+  if (["localhost", "127.0.0.1", "[::1]"].includes(window.location.hostname)) {
+    return `${window.location.origin}/index.html?r=${encodeURIComponent(restaurant.id)}`;
+  }
+  return `${window.location.origin}/${encodeURIComponent(restaurant.slug)}`;
+}
+
 const SUPABASE_ANON_KEY = window.KARIBU_SUPABASE_ANON_KEY || "YOUR_V2_PUBLISHABLE_OR_ANON_KEY";
 async function callRpc(name, params) {
   const loginRpc = name === "owner_login" || name === "staff_login";
@@ -208,9 +216,10 @@ function RestaurantRow({
   const [confirmingDelete, setConfirmingDelete] = React.useState(false);
   const [confirmText, setConfirmText] = React.useState("");
   const [deleting, setDeleting] = React.useState(false);
+  const [linkCopied, setLinkCopied] = React.useState(false);
   const dirty = name !== r.name || appName !== (r.app_name || "Karibu Academy") || status !== r.payment_status || note !== (r.payment_note || "");
   const meta = STATUS_META[status] || STATUS_META.active;
-  const staffUrl = r.slug ? `${window.location.origin}/${r.slug}` : `${window.location.origin}/training?r=${r.id}`;
+  const trainingUrl = trainingUrlForRestaurant(r);
   async function handleSave() {
     setSaving(true);
     setSaved(false);
@@ -251,6 +260,23 @@ function RestaurantRow({
       onDeleted(r.id);
     }
   }
+  async function copyTrainingLink() {
+    if (!trainingUrl) return;
+    await navigator.clipboard.writeText(trainingUrl);
+    setLinkCopied(true);
+    setTimeout(() => setLinkCopied(false), 1800);
+  }
+  async function shareTrainingLink() {
+    if (!trainingUrl) return;
+    if (navigator.share) {
+      await navigator.share({
+        title: `${r.name} training`,
+        url: trainingUrl
+      });
+      return;
+    }
+    await copyTrainingLink();
+  }
   return /*#__PURE__*/React.createElement("div", {
     style: styles.row
   }, /*#__PURE__*/React.createElement("div", {
@@ -272,18 +298,35 @@ function RestaurantRow({
     style: {
       ...styles.badge,
       color: meta.color,
-    background: meta.bg
-  }
-  }, meta.label)), /*#__PURE__*/React.createElement("a", {
-    href: staffUrl,
+      background: meta.bg
+    }
+  }, meta.label)), trainingUrl && /*#__PURE__*/React.createElement("a", {
+    href: trainingUrl,
     target: "_blank",
     rel: "noreferrer",
     style: {
       ...styles.textBtn,
       color: COLORS.avocado,
-      textDecoration: "none"
+      textDecoration: "none",
+      marginTop: 8,
+      display: "inline-block"
     }
-  }, "Open training app ↗")), /*#__PURE__*/React.createElement("div", {
+  }, trainingUrl), trainingUrl && /*#__PURE__*/React.createElement("span", {
+    style: {
+      display: "inline-flex",
+      gap: 8,
+      marginTop: 8,
+      marginLeft: 8
+    }
+  }, /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    style: styles.textBtn,
+    onClick: copyTrainingLink
+  }, linkCopied ? "Link copied!" : "Copy link"), /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    style: styles.textBtn,
+    onClick: shareTrainingLink
+  }, "Share link")), /*#__PURE__*/React.createElement("div", {
     style: {
       marginTop: 12
     }
@@ -385,7 +428,7 @@ function RestaurantRow({
       setConfirmingDelete(false);
       setConfirmText("");
     }
-  }, "Cancel"))));
+  }, "Cancel")))));
 }
 const MONTH_NAMES = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
 function formatDuration(totalSeconds) {
@@ -561,7 +604,8 @@ function Dashboard({
   const [managerName, setManagerName] = React.useState("");
   const [managerPin, setManagerPin] = React.useState("");
   const [adding, setAdding] = React.useState(false);
-  const [createdLink, setCreatedLink] = React.useState(null); // { restaurantId, managerName, managerPin, url }, memory only
+  const [createdLink, setCreatedLink] = React.useState(null); // { restaurantId, restaurantName, managerName, managerPin, url }, memory only
+  const [createdDetailsCopied, setCreatedDetailsCopied] = React.useState(false);
   const [reportFor, setReportFor] = React.useState(null); // restaurant object, or null
 
   async function load() {
@@ -603,10 +647,12 @@ function Dashboard({
     const staffUrl = await staffAppUrl(newName.trim(), data.restaurant_id);
     setCreatedLink({
       restaurantId: data.restaurant_id,
+      restaurantName: newName.trim(),
       managerName: managerName.trim(),
       managerPin,
       url: staffUrl
     });
+    setCreatedDetailsCopied(false);
     setNewName("");
     setNewAppName("Karibu Academy");
     setManagerName("");
@@ -618,6 +664,17 @@ function Dashboard({
     setRestaurants(prev => prev.filter(x => x.id !== deletedId));
     setReportFor(current => current?.id === deletedId ? null : current);
     setCreatedLink(current => current?.restaurantId === deletedId ? null : current);
+  }
+  async function copyCreatedDetails() {
+    if (!createdLink) return;
+    const message = [
+      `Restaurant: ${createdLink.restaurantName}`,
+      `Training link: ${createdLink.url}`,
+      `Manager: ${createdLink.managerName}`,
+      `PIN: ${createdLink.managerPin}`
+    ].join("\n");
+    await navigator.clipboard.writeText(message);
+    setCreatedDetailsCopied(true);
   }
   return /*#__PURE__*/React.createElement("div", {
     style: styles.page
@@ -685,9 +742,18 @@ function Dashboard({
       color: COLORS.stone
     }
   }, /*#__PURE__*/React.createElement("button", {
-    style: styles.textBtn,
+    style: styles.primaryBtn,
+    onClick: copyCreatedDetails
+  }, createdDetailsCopied ? "Details copied!" : "Copy details"), /*#__PURE__*/React.createElement("button", {
+    style: {
+      ...styles.textBtn,
+      marginLeft: 12,
+      opacity: createdDetailsCopied ? 1 : 0.45,
+      cursor: createdDetailsCopied ? "pointer" : "not-allowed"
+    },
+    disabled: !createdDetailsCopied,
     onClick: () => setCreatedLink(null)
-  }, "Dismiss"))), !restaurants && !error && /*#__PURE__*/React.createElement("p", {
+  }, "Close"))), !restaurants && !error && /*#__PURE__*/React.createElement("p", {
     style: {
       color: COLORS.stone
     }

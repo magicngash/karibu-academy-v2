@@ -2162,7 +2162,11 @@ function ManagerDashboard({
       const responses = [];
       (data || []).forEach(item => { responses[item.question_index] = item.answer; });
       setSelectedModule1Answers(responses);
-      setSelectedModule1Reviews(data || []);
+      // Key reviews by question_index so scores line up with the right question
+      // even when the student skipped some questions.
+      const reviewsByIndex = [];
+      (data || []).forEach(item => { reviewsByIndex[item.question_index] = item; });
+      setSelectedModule1Reviews(reviewsByIndex);
       const drafts = {};
       (data || []).forEach(item => { drafts[item.question_index] = item.trainer_score == null ? "" : String(item.trainer_score); });
       setTrainerDrafts(drafts);
@@ -2309,7 +2313,7 @@ function ManagerDashboard({
   }, "Module 1 results for ", selectedStaff.full_name, ". Managers can view submitted answers and automatic system scores."), /*#__PURE__*/React.createElement("div", { style: { display: "flex", flexWrap: "wrap", gap: 12, margin: "10px 0 14px", padding: "10px 12px", background: "#F1E9DA", borderRadius: 10 } }, /*#__PURE__*/React.createElement("strong", null, "Overall Module 1: ", selectedModule1OverallScore === null ? "Not scored" : `${selectedModule1OverallScore}%`), /*#__PURE__*/React.createElement("span", { style: { color: COLORS.stone, fontSize: "0.85rem" } }, `MCQ ${selectedModule1McqScore}/${selectedModule1McqTotal || "—"} · Written ${selectedModule1WrittenScore}/${MODULE_1_REVIEW.length * 2}`), /*#__PURE__*/React.createElement("span", { style: { color: selectedModule1OverallScore !== null && selectedModule1OverallScore >= 80 ? COLORS.avocado : COLORS.stone, fontWeight: 700 } }, selectedModule1OverallScore !== null ? selectedModule1OverallScore >= 80 ? "Passed" : "Not passed" : "Awaiting marking")), writtenAnswerError && /*#__PURE__*/React.createElement("p", { style: { ...styles.feedbackText, color: COLORS.chili } }, "Answer storage: ", writtenAnswerError), MODULE_1_REVIEW.map((item, questionIndex) => /*#__PURE__*/React.createElement("div", {
     key: item.q,
      style: { borderTop: questionIndex ? "1px solid #E3D8C5" : "none", paddingTop: questionIndex ? 16 : 0, marginTop: questionIndex ? 16 : 0 }
-  }, /*#__PURE__*/React.createElement("span", { style: styles.moduleCardTitle }, "Question ", questionIndex + 1), /*#__PURE__*/React.createElement("p", { style: { ...styles.bodyText, margin: "6px 0" } }, item.q), /*#__PURE__*/React.createElement("div", { style: { marginTop: 8, fontSize: "0.9rem", color: COLORS.stone } }, /*#__PURE__*/React.createElement("strong", null, "Staff answer: "), selectedModule1Answers[questionIndex] || "No submitted answer yet."), /*#__PURE__*/React.createElement("div", { style: { marginTop: 8, color: COLORS.stone, fontSize: "0.85rem" } }, /*#__PURE__*/React.createElement("strong", null, "Automatic system score: "), selectedModule1Reviews[questionIndex]?.ai_score == null ? "Not run" : `${selectedModule1Reviews[questionIndex].ai_score}/2`), selectedModule1Reviews[questionIndex]?.ai_feedback && /*#__PURE__*/React.createElement("div", { style: { marginTop: 6, color: COLORS.stone, fontSize: "0.85rem" } }, /*#__PURE__*/React.createElement("strong", null, "Feedback: "), selectedModule1Reviews[questionIndex].ai_feedback)), /*#__PURE__*/React.createElement("div", { style: { marginTop: 8, color: COLORS.stone, fontSize: "0.85rem" } }, /*#__PURE__*/React.createElement("strong", null, "Final score: "), selectedModule1Reviews[questionIndex]?.trainer_score != null ? `${selectedModule1Reviews[questionIndex].trainer_score}/2` : selectedModule1Reviews[questionIndex]?.ai_score != null ? `${selectedModule1Reviews[questionIndex].ai_score}/2` : "Not scored"))), !rows && !error && /*#__PURE__*/React.createElement("p", {
+  }, /*#__PURE__*/React.createElement("span", { style: styles.moduleCardTitle }, "Question ", questionIndex + 1), /*#__PURE__*/React.createElement("p", { style: { ...styles.bodyText, margin: "6px 0" } }, item.q), /*#__PURE__*/React.createElement("div", { style: { marginTop: 8, fontSize: "0.9rem", color: COLORS.stone } }, /*#__PURE__*/React.createElement("strong", null, "Staff answer: "), selectedModule1Answers[questionIndex] || "No submitted answer yet."), /*#__PURE__*/React.createElement("div", { style: { marginTop: 8, color: COLORS.stone, fontSize: "0.85rem" } }, /*#__PURE__*/React.createElement("strong", null, "Automatic system score: "), selectedModule1Reviews[questionIndex]?.ai_score == null ? "Not run" : `${selectedModule1Reviews[questionIndex].ai_score}/2`), selectedModule1Reviews[questionIndex]?.ai_feedback && /*#__PURE__*/React.createElement("div", { style: { marginTop: 6, color: COLORS.stone, fontSize: "0.85rem" } }, /*#__PURE__*/React.createElement("strong", null, "Feedback: "), selectedModule1Reviews[questionIndex].ai_feedback), /*#__PURE__*/React.createElement("div", { style: { marginTop: 8, color: COLORS.stone, fontSize: "0.85rem" } }, /*#__PURE__*/React.createElement("strong", null, "Final score: "), selectedModule1Reviews[questionIndex]?.trainer_score != null ? `${selectedModule1Reviews[questionIndex].trainer_score}/2` : selectedModule1Reviews[questionIndex]?.ai_score != null ? `${selectedModule1Reviews[questionIndex].ai_score}/2` : "Not scored")))), !rows && !error && /*#__PURE__*/React.createElement("p", {
     style: styles.bodyText
   }, "Loading staff progress..."), rows && /*#__PURE__*/React.createElement("div", {
     style: {
@@ -3427,6 +3431,31 @@ const styles = {
   }
 };
 
+// Catches render errors so a bug in one screen shows a message instead of
+// blanking the whole app.
+class ErrorBoundary extends React.Component {
+  constructor(props) {
+    super(props);
+    this.state = { failed: false };
+  }
+  static getDerivedStateFromError() {
+    return { failed: true };
+  }
+  componentDidCatch(error, info) {
+    console.error("Karibu Academy render error:", error, info && info.componentStack);
+  }
+  render() {
+    if (!this.state.failed) return this.props.children;
+    return React.createElement("div", {
+      role: "alert",
+      style: { padding: 32, maxWidth: 420, margin: "10vh auto", textAlign: "center", fontFamily: "'Inter', sans-serif", color: COLORS.espresso }
+    }, React.createElement("h2", { style: { margin: "0 0 8px" } }, "Something went wrong"), React.createElement("p", { style: { margin: "0 0 18px", color: COLORS.stone } }, "This page could not be displayed. Reload to try again."), React.createElement("button", {
+      style: styles.primaryBtn,
+      onClick: () => window.location.reload()
+    }, "Reload"));
+  }
+}
+
 async function bootTrainingApp() {
   if (ROUTE_SLUG && !routeParams.get("r")) {
     const {
@@ -3443,7 +3472,7 @@ async function bootTrainingApp() {
   } else if (!RESTAURANT_ID) {
     RESTAURANT_ROUTE_ERROR = "Open the restaurant's V2 training link to continue.";
   }
-  ReactDOM.createRoot(document.getElementById("root")).render(React.createElement(App));
+  ReactDOM.createRoot(document.getElementById("root")).render(React.createElement(ErrorBoundary, null, React.createElement(App)));
 }
 bootTrainingApp();
 </script>

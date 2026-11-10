@@ -595,6 +595,55 @@ const LEGACY_MODULE_DATA = {
 
 // The uploaded curriculum is the source of truth for training content.
 const MODULE_DATA = window.TRAINING_MODULE_DATA;
+const MCQ_BALANCING_ADDITIONS = {
+  1: {
+    q: "After acknowledging a new guest during a busy period, what should you do next?",
+    options: [
+      { label: "Finish the current task calmly, then greet and assist them as soon as possible", correct: true },
+      { label: "Ignore them until they ask for help", correct: false },
+      { label: "Leave the current task unfinished immediately", correct: false }
+    ],
+    feedback: "A prompt acknowledgement followed by calm follow-through keeps the guest informed without creating another service problem."
+  },
+  2: {
+    q: "If you are unsure whether a dish contains an allergen, what should you do?",
+    options: [
+      { label: "Confirm the ingredients with the kitchen before answering the guest", correct: true },
+      { label: "Guess based on how the dish looks", correct: false },
+      { label: "Tell the guest it is probably safe", correct: false }
+    ],
+    feedback: "Allergy questions require verified information; never guess when guest safety is involved."
+  },
+  7: [
+    {
+      q: "What is the clearest way to communicate a service limitation to a guest?",
+      options: [
+        { label: "Explain the limitation honestly and offer the best available alternative", correct: true },
+        { label: "Use vague language so the guest does not ask more questions", correct: false },
+        { label: "Tell the guest to ask another staff member without explanation", correct: false }
+      ],
+      feedback: "Clear, honest communication paired with a helpful alternative maintains trust even when a request cannot be fulfilled."
+    },
+    {
+      q: "How should you adapt your communication for a guest who is having difficulty understanding?",
+      options: [
+        { label: "Use simpler language, speak clearly, and check their understanding", correct: true },
+        { label: "Repeat the same complicated explanation more quickly", correct: false },
+        { label: "Stop communicating and walk away", correct: false }
+      ],
+      feedback: "Adapting language and confirming understanding helps the guest feel supported and reduces mistakes."
+    }
+  ]
+};
+Object.entries(MCQ_BALANCING_ADDITIONS).forEach(([moduleId, question]) => {
+  if (MODULE_DATA[moduleId] && MODULE_DATA[moduleId].quiz.length < 5) {
+    const additions = Array.isArray(question) ? question : [question];
+    MODULE_DATA[moduleId].quiz.push(...additions.slice(0, 5 - MODULE_DATA[moduleId].quiz.length));
+  }
+});
+Object.keys(MODULE_DATA).forEach(moduleId => {
+  if (MODULE_DATA[moduleId].quiz.length > 5) MODULE_DATA[moduleId].quiz = MODULE_DATA[moduleId].quiz.slice(0, 5);
+});
 
 const OPEN_ENDED_QUESTIONS = {
   1: [
@@ -705,6 +754,78 @@ const MODULE_1_REVIEW = [
     sample: "I would welcome the guest warmly without guessing their name, then discreetly check the reservation or ask a colleague. I would continue the conversation naturally and use their name once I have confirmed it."
   }
 ];
+
+const buildWrittenReview = (moduleId, entries) => entries.map((entry, index) => ({
+  q: OPEN_ENDED_QUESTIONS[moduleId][index],
+  rubric: entry.rubric,
+  sample: entry.sample
+}));
+const WRITTEN_REVIEW = {
+  1: MODULE_1_REVIEW,
+  2: buildWrittenReview(2, [
+    { rubric: "Award 2/2 for checking the briefing, reviewing ingredients, specials, allergens, and preparation times. Award 1/2 for mentioning some preparation but omitting important checks. Award 0/2 for relying on guessing.", sample: "I would attend the pre-shift briefing, review the menu and specials, confirm ingredients, allergens, portions, and preparation times, and ask the kitchen about anything unclear." },
+    { rubric: "Award 2/2 for explaining that portion and substitution knowledge supports accurate expectations, safe choices, and confident recommendations. Award 1/2 for only one benefit. Award 0/2 for saying staff should guess or promise unavailable options.", sample: "Knowing portions and substitutions helps me give accurate advice, identify suitable alternatives, and avoid promising something the kitchen cannot provide." },
+    { rubric: "Award 2/2 for acknowledging the request, checking feasibility with the kitchen, explaining limits honestly, and offering a safe alternative. Award 1/2 for only checking or offering an alternative. Award 0/2 for promising without confirmation.", sample: "I would repeat the request, check with the kitchen whether it is safe and practical, then explain what can be done and offer the closest suitable alternative if needed." },
+    { rubric: "Award 2/2 for taking vegetarian suitability seriously, checking ingredients and preparation, avoiding cross-contamination assumptions, and communicating clearly. Award 1/2 for checking ingredients without addressing preparation or safety. Award 0/2 for guessing.", sample: "I would confirm every ingredient and the preparation method with the kitchen, check whether cross-contamination is a concern, and give the guest a verified answer rather than guessing." },
+    { rubric: "Award 2/2 for connecting preparation methods and ingredient quality to flavour, texture, freshness, and guest value. Award 1/2 for describing only one product feature. Award 0/2 for irrelevant or inaccurate claims.", sample: "Explaining how a dish is prepared and why its ingredients matter helps the guest understand its flavour, texture, freshness, and value before choosing it." }
+  ]),
+  3: buildWrittenReview(3, [
+    { rubric: "Award 2/2 for identifying the guest's experience, preferences, needs, and familiarity, then adapting the recommendation accordingly. Award 1/2 for mentioning only familiarity or preference. Award 0/2 for recommending identically without asking questions.", sample: "I would ask a first-time guest about tastes and explain suitable options clearly, while using a regular guest's known preferences and offering something appropriate but not assuming they want the same choice every time." },
+    { rubric: "Award 2/2 for linking product knowledge to accurate descriptions, suitable recommendations, allergy awareness, and guest trust. Award 1/2 for only mentioning confidence or sales. Award 0/2 for supporting guesses.", sample: "Understanding products lets staff describe them accurately, identify suitable choices and risks, answer questions honestly, and recommend with confidence." },
+    { rubric: "Award 2/2 for explaining the product accurately, highlighting relevant flavour or preparation details, checking interest, and avoiding exaggerated claims. Award 1/2 for a basic description without tailoring. Award 0/2 for inventing details.", sample: "I would describe the seasonal product's ingredients, preparation, flavour, and why it is special, then ask what the guest enjoys and recommend it only if it fits." },
+    { rubric: "Award 2/2 for considering guest preferences, budget, suitability, value, and explaining the benefit without pressure. Award 1/2 for only mentioning price or quality. Award 0/2 for pressuring the guest.", sample: "I would consider what the guest likes, their budget and the occasion, explain the genuine benefit of the premium option, and let them choose without pressure." },
+    { rubric: "Award 2/2 for making relevant pairing suggestions that improve the meal and increase value without being pushy. Award 1/2 for suggesting combinations without explaining suitability. Award 0/2 for irrelevant upselling.", sample: "I would use my knowledge of flavours and portions to suggest a complementary product, explain why it works with the guest's choice, and accept their decision." }
+  ]),
+  4: buildWrittenReview(4, [
+    { rubric: "Award 2/2 for safe carrying, stable handling, checking the path, communicating with colleagues, and protecting guests from spills or hot items. Award 1/2 for only one safety measure. Award 0/2 for unsafe handling.", sample: "I would check the tray is balanced, keep a clear route, carry hot items carefully, warn colleagues and guests when needed, and never reach over guests or rush." },
+    { rubric: "Award 2/2 for waiting for a suitable moment, asking permission where appropriate, clearing quietly and safely, and respecting personal space. Award 1/2 for mentioning timing without guest comfort. Award 0/2 for interrupting or reaching across guests.", sample: "I would watch for a natural pause, ask politely if I can clear, remove items quietly from the accessible side, and avoid interrupting conversation or reaching across guests." },
+    { rubric: "Award 2/2 for considering conversation, courses, guest cues, table readiness, and avoiding interruptions. Award 1/2 for only mentioning waiting for a pause. Award 0/2 for a fixed or intrusive approach.", sample: "I would observe the table, wait for a natural pause, check whether guests are still using items, and approach promptly when service or clearing is needed without interrupting." },
+    { rubric: "Award 2/2 for checking the ticket, coordinating timing with kitchen/bar and colleagues, communicating delays, and delivering safely and accurately. Award 1/2 for coordination without checking accuracy. Award 0/2 for delivering randomly.", sample: "I would check the ticket, coordinate with the kitchen and bar, communicate which items are ready, deliver complete items in a sensible order, and keep the table informed." },
+    { rubric: "Award 2/2 for clearing, cleaning, sanitising, resetting required items, inspecting the table, and marking it ready. Award 1/2 for omitting one important step. Award 0/2 for leaving it incomplete.", sample: "I would clear used items, clean and sanitise the table, check chairs and menus, replace the required setup, inspect everything, and confirm the table is ready." }
+  ]),
+  5: buildWrittenReview(5, [
+    { rubric: "Award 2/2 for counting cash visibly, confirming the amount, safeguarding it, calculating change accurately, and providing a receipt or record. Award 1/2 for only counting or securing cash. Award 0/2 for careless handling.", sample: "I would confirm the bill, count the cash where the guest can see, secure it promptly, calculate and count change back accurately, and provide the required receipt." },
+    { rubric: "Award 2/2 for confirming the amount, using the authorised terminal, protecting card details, checking approval, and providing a receipt. Award 1/2 for a partial process. Award 0/2 for bypassing verification.", sample: "I would confirm the amount, use the authorised card terminal, keep the transaction private, wait for approval, verify completion, and offer the receipt." },
+    { rubric: "Award 2/2 for listening calmly, checking the bill and records, avoiding blame, involving a supervisor when needed, and resolving or explaining the discrepancy transparently. Award 1/2 for only checking or escalating. Award 0/2 for arguing or ignoring it.", sample: "I would listen without arguing, review the itemised bill and payment record, explain what I find, correct any error, and involve the supervisor if the dispute remains unresolved." },
+    { rubric: "Award 2/2 for acknowledging the wait, providing honest updates, offering suitable comfort options, and checking back. Award 1/2 for only giving an estimate. Award 0/2 for ignoring waiting guests.", sample: "I would greet waiting guests, give a realistic update, offer menus or water where available, explain changes promptly, and check back so they do not feel forgotten." },
+    { rubric: "Award 2/2 for explaining that accuracy and transparency protect trust, prevent disputes, and ensure correct records and charges. Award 1/2 for only mentioning accuracy or trust. Award 0/2 for accepting shortcuts.", sample: "Accurate and transparent billing protects the guest and business, prevents disputes, keeps records correct, and maintains trust in service charges and payments." }
+  ]),
+  6: buildWrittenReview(6, [
+    { rubric: "Award 2/2 for checking the guest's response, confirming the practical fix, following up, and recording or escalating unresolved concerns. Award 1/2 for only asking if the guest is satisfied. Award 0/2 for assuming the problem is solved.", sample: "I would follow up after the fix, ask whether it addressed the concern, observe the guest's response, and escalate or record the issue if anything remains unresolved." },
+    { rubric: "Award 2/2 for empathising, explaining what is outside control without defensiveness, offering practical options, and keeping the guest updated. Award 1/2 for apology without a clear action. Award 0/2 for blaming others.", sample: "I would acknowledge the frustration, explain the situation honestly without making excuses, offer the available options, give realistic updates, and involve a supervisor if needed." },
+    { rubric: "Award 2/2 for identifying patterns, recording facts, discussing them with supervisors, and using them to improve training or processes. Award 1/2 for noticing repetition without an action. Award 0/2 for dismissing complaints.", sample: "Repeated complaints reveal process or training gaps. I would record the facts, share the pattern with supervisors, identify the cause, and use it to improve procedures and coaching." },
+    { rubric: "Award 2/2 for distinguishing an apology from ownership and describing concrete corrective action and follow-through. Award 1/2 for explaining only the difference in words. Award 0/2 for treating apology as sufficient.", sample: "An apology acknowledges the guest's experience; taking responsibility means owning the response, correcting the problem, communicating the next step, and following through." },
+    { rubric: "Award 2/2 for staying calm, listening, acknowledging feelings, setting respectful boundaries, offering reasonable options, and escalating when necessary. Award 1/2 for calmness without a response plan. Award 0/2 for arguing or retaliating.", sample: "I would remain calm, listen without taking the words personally, acknowledge the concern, explain what I can do, offer a reasonable next step, and involve a supervisor if safety or resolution requires it." }
+  ]),
+  7: buildWrittenReview(7, [
+    { rubric: "Award 2/2 for using clear words, confirming details, listening actively, and checking understanding. Award 1/2 for mentioning clarity without confirmation. Award 0/2 for relying on jargon or assumptions.", sample: "Clear, concise language reduces ambiguity, while repeating key details and checking understanding prevents mistakes in orders, timings, and guest requests." },
+    { rubric: "Award 2/2 for stating the limitation honestly, explaining the reason briefly, offering an alternative, and maintaining a helpful tone. Award 1/2 for only explaining or apologising. Award 0/2 for dismissing the guest.", sample: "I would explain honestly what cannot be done, avoid blaming others, offer the closest available alternative, and check whether that solution works for the guest." },
+    { rubric: "Award 2/2 for adapting pace, vocabulary, tone, and confirmation to the guest's needs while remaining respectful. Award 1/2 for only speaking more slowly. Award 0/2 for embarrassment or impatience.", sample: "I would use simpler words, speak clearly at a comfortable pace, use an appropriate example or written information, and politely check that the guest understood." },
+    { rubric: "Award 2/2 for explaining that jargon, slang, and ambiguity can cause misunderstanding, mistakes, exclusion, and reduced trust. Award 1/2 for only mentioning confusion. Award 0/2 for treating clarity as optional.", sample: "Technical terms, slang, and vague expressions can confuse guests and create service errors, so plain language protects understanding, inclusion, and trust." },
+    { rubric: "Award 2/2 for giving a relevant example combining reassuring words, tone, eye contact, posture, or gestures, and checking the guest's response. Award 1/2 for only verbal or non-verbal communication. Award 0/2 for an unclear example.", sample: "I would calmly say, ‘I can help with that,’ use a warm tone and eye contact, gesture toward the next step, and check that the guest feels comfortable proceeding." }
+  ]),
+  8: buildWrittenReview(8, [
+    { rubric: "Award 2/2 for identifying the guest's preferred interaction level and adapting pace, questions, and follow-up respectfully. Award 1/2 for only mentioning talking less or more. Award 0/2 for forcing one style on everyone.", sample: "I would keep interactions concise and unobtrusive for a guest who prefers minimal conversation, while engaging warmly and allowing more discussion with a guest who enjoys it, always watching their cues." },
+    { rubric: "Award 2/2 for recognising behavioural or emotional cues early, checking in empathetically, and offering practical help before escalation. Award 1/2 for noticing stress without a response. Award 0/2 for ignoring the signs.", sample: "Noticing tense expressions, repeated questions, silence, or impatience lets me check in early, clarify the need, and offer help before a small concern becomes a complaint." },
+    { rubric: "Award 2/2 for defining empathy as understanding the guest's perspective, acknowledging feelings, and responding with appropriate action. Award 1/2 for sympathy without practical action. Award 0/2 for dismissing emotion.", sample: "Building trust through empathy means listening from the guest's perspective, acknowledging how the situation feels, and taking a practical helpful action rather than simply saying sorry." },
+    { rubric: "Award 2/2 for observing cues, asking an open and respectful question, listening, and offering a helpful next step without assuming. Award 1/2 for asking but not following up. Award 0/2 for guessing or ignoring disappointment.", sample: "I would notice the change in mood, ask gently whether something is wrong, listen without pressure, and offer an appropriate solution once I understand the concern." },
+    { rubric: "Award 2/2 for separating the guest's feeling from personal judgment, remaining calm, and focusing on the service need and solution. Award 1/2 for calmness without explaining the distinction. Award 0/2 for becoming defensive.", sample: "A guest's frustration is information about their experience, not a personal attack. I would stay professional, listen, and focus on resolving the service issue." }
+  ]),
+  9: buildWrittenReview(9, [
+    { rubric: "Award 2/2 for including guest or table status, pending orders or requests, timings, payments, incidents, and ownership of follow-up tasks. Award 1/2 for listing only general tasks. Award 0/2 for an incomplete handover.", sample: "A handover should cover table and guest status, VIP or dietary notes, pending orders, delays, payments, incidents, deadlines, and who is responsible for each follow-up." },
+    { rubric: "Award 2/2 for connecting poor communication to delays, errors, duplicated or missed work, inconsistent standards, and guest dissatisfaction. Award 1/2 for naming only one consequence. Award 0/2 for saying it has no effect.", sample: "Poor communication causes missed requests, delays, incorrect orders, duplicated work, and inconsistent service, which reduces guest confidence and satisfaction." },
+    { rubric: "Award 2/2 for acknowledging the mistake, informing the affected department or supervisor, helping correct it, and learning from it without blame. Award 1/2 for admitting the mistake without corrective action. Award 0/2 for hiding or shifting blame.", sample: "I would tell the affected colleague or supervisor promptly, explain what happened accurately, help correct the impact, and review how to prevent the error recurring." },
+    { rubric: "Award 2/2 for identifying safety, service, financial, operational, repeated, or unresolved concerns and reporting them promptly through the correct line. Award 1/2 for reporting only serious incidents. Award 0/2 for hiding concerns.", sample: "I would report a concern when it risks guest safety, service continuity, finances, compliance, or repeated operational failure, using the established supervisor or reporting channel." },
+    { rubric: "Award 2/2 for describing psychological safety, respectful requests, active help, clear communication, and shared accountability. Award 1/2 for only saying colleagues should be friendly. Award 0/2 for encouraging silence or blame.", sample: "Teams can make help normal by speaking respectfully, sharing information, offering assistance early, thanking colleagues, and treating questions or mistakes as opportunities to improve rather than punish." }
+  ]),
+  10: buildWrittenReview(10, [
+    { rubric: "Award 2/2 for checking appearance, hygiene, uniform, tools, station readiness, briefing information, and personal readiness before service. Award 1/2 for only appearance or station checks. Award 0/2 for starting without preparation.", sample: "I would check my uniform and hygiene, confirm my tools and station are ready, review the briefing and specials, and resolve any readiness issue before serving guests." },
+    { rubric: "Award 2/2 for linking organisation to efficiency, accuracy, safety, readiness, and consistent service. Award 1/2 for only mentioning speed or cleanliness. Award 0/2 for treating organisation as unimportant.", sample: "An organised workstation keeps tools and supplies accessible, reduces wasted movement and errors, supports hygiene and safety, and helps service remain consistent during busy periods." },
+    { rubric: "Award 2/2 for explaining that checks catch missing, incorrect, unsafe, or poorly presented items before they reach guests. Award 1/2 for only mentioning accuracy. Award 0/2 for relying on guest complaints.", sample: "Checking an order before delivery catches missing items, special-request errors, presentation problems, and safety issues while they can still be corrected privately." },
+    { rubric: "Award 2/2 for reviewing objective performance, identifying a specific gap, choosing an improvement action, and checking progress after future shifts. Award 1/2 for reflection without a plan. Award 0/2 for ignoring weaknesses.", sample: "After a shift I would compare my performance with the checklist, identify a specific gap, choose a practical action for the next shift, and review whether it improved." },
+    { rubric: "Award 2/2 for describing shared standards, clear communication, coaching, observation, feedback, and follow-up across shifts. Award 1/2 for only mentioning meetings or supervision. Award 0/2 for leaving consistency to individuals.", sample: "Supervisors and employees can agree clear standards, share handover information, observe service, discuss gaps constructively, coach staff, and follow up so standards remain consistent across shifts." }
+  ])
+};
 
 // Local AI-assist prototype for the pilot review. Each criterion is checked
 // against the learner's wording and produces a suggested 0-2 score. The
@@ -1021,7 +1142,8 @@ function ModuleFlow({
   onFinish,
   resumeKey,
   isManager,
-  onManagerDashboard
+  onManagerDashboard,
+  onLogout
 }) {
   const savedProgress = React.useMemo(() => {
     try {
@@ -1033,6 +1155,11 @@ function ModuleFlow({
   const [step, setStep] = React.useState(() => savedProgress?.step || 0); // 0 = course landing page
   const [selected, setSelected] = React.useState(null);
   const [answers, setAnswers] = React.useState(() => savedProgress?.answers || []);
+  const [selectedOptions, setSelectedOptions] = React.useState(() => savedProgress?.selectedOptions || []);
+  const [assessmentAttemptId, setAssessmentAttemptId] = React.useState(() => savedProgress?.assessmentAttemptId || null);
+  const [assessmentResult, setAssessmentResult] = React.useState(null);
+  const [completionError, setCompletionError] = React.useState("");
+  const [completing, setCompleting] = React.useState(false);
   const writtenKey = resumeKey ? resumeKey.replace("karibu-training:", "karibu-written:") : null;
   const [writtenResponses, setWrittenResponses] = React.useState(() => {
     try {
@@ -1054,39 +1181,111 @@ function ModuleFlow({
   const inQuiz = quizIndex >= 0 && quizIndex < quiz.length;
   const isComplete = step === TOTAL_STEPS - 1;
   const score = answers.filter((answer, index) => quiz[index]?.type !== "shortAnswer" && answer === true).length;
+  const autoGradedTotal = getAutoGradedTotal(moduleData);
+  const passed = assessmentResult?.passed === true;
   const progressPct = Math.round(step / (TOTAL_STEPS - 1) * 100);
   React.useEffect(() => {
     if (screenRef.current) screenRef.current.scrollTop = 0;
   }, [step]);
   React.useEffect(() => {
     if (resumeKey && !isComplete) {
-      localStorage.setItem(resumeKey, JSON.stringify({ step, answers, updatedAt: Date.now() }));
+      localStorage.setItem(resumeKey, JSON.stringify({ step, answers, selectedOptions, assessmentAttemptId, updatedAt: Date.now() }));
     }
-  }, [resumeKey, step, answers, isComplete]);
-  function next() {
-    setSelected(null);
-    setStep(s => {
-      const ns = Math.min(s + 1, TOTAL_STEPS - 1);
-      if (ns === TOTAL_STEPS - 1) {
-        if (resumeKey) localStorage.removeItem(resumeKey);
-        onFinish(score);
+  }, [resumeKey, step, answers, selectedOptions, assessmentAttemptId, isComplete]);
+  React.useEffect(() => {
+    let active = true;
+    if (!session?.staffId || !resumeKey || assessmentAttemptId) return undefined;
+    const moduleId = Number(resumeKey.split(":").pop());
+    callRpc("start_assessment_attempt", { p_staff_id: session.staffId, p_module_id: moduleId }).then(({ data, error }) => {
+      if (!active) return;
+      if (error || !data?.success) {
+        setCompletionError(error?.message || data?.error || "Could not start the assessment attempt.");
+        return;
       }
-      return ns;
+      setAssessmentAttemptId(data.attempt_id);
     });
+    return () => { active = false; };
+  }, [session?.staffId, resumeKey, assessmentAttemptId]);
+  async function completeAssessment() {
+    if (completing) return false;
+    if (!assessmentAttemptId) {
+      setCompletionError("This assessment is not ready to complete. Please reload and try again.");
+      return false;
+    }
+    setCompleting(true);
+    setCompletionError("");
+    const questions = quiz.filter(question => question.type === "shortAnswer").map(question => question.q);
+    let token = null;
+    try { token = localStorage.getItem(AUTH_TOKEN_KEY); } catch (_) {}
+    try {
+      const response = await fetch("/.netlify/functions/complete-assessment", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+        body: JSON.stringify({ attempt_id: assessmentAttemptId, questions })
+      });
+      const result = await response.json().catch(() => null);
+      if (!response.ok || !result?.success) throw new Error(result?.error || "Could not complete the assessment.");
+      setAssessmentResult(result);
+      if (resumeKey) localStorage.removeItem(resumeKey);
+      onFinish(result.mcq_score, result.mcq_total, result.passed, result);
+      setStep(TOTAL_STEPS - 1);
+      return true;
+    } catch (error) {
+      setCompletionError(error.message || "Could not complete the assessment.");
+      return false;
+    } finally {
+      setCompleting(false);
+    }
+  }
+  async function next() {
+    if (completing) return;
+    const ns = Math.min(step + 1, TOTAL_STEPS - 1);
+    if (ns === TOTAL_STEPS - 1) {
+      await completeAssessment();
+      return;
+    }
+    setStep(ns);
   }
   function previous() {
-    setSelected(null);
     setStep(s => Math.max(0, s - 1));
   }
   function selectAnswer(optIdx) {
-    if (selected !== null) return;
-    const opt = quiz[quizIndex].options[optIdx];
+    if (selectedOptions[quizIndex] !== undefined) return;
     setSelected(optIdx);
-    setAnswers(a => {
-      const copy = [...a];
-      copy[quizIndex] = opt.correct;
+    setSelectedOptions(previous => {
+      const copy = [...previous];
+      copy[quizIndex] = optIdx;
       return copy;
     });
+    setAnswers(a => {
+      const copy = [...a];
+      copy[quizIndex] = true;
+      return copy;
+    });
+    if (assessmentAttemptId && session?.staffId) {
+      callRpc("save_mcq_answer", {
+        p_attempt_id: assessmentAttemptId,
+        p_question_index: quizIndex,
+        p_selected_option_index: optIdx
+      }).then(result => {
+        if (result.error || !result.data?.success) console.warn("MCQ answer was saved locally but not to the assessment attempt.", result.error || result.data);
+      });
+    }
+  }
+  React.useEffect(() => {
+    setSelected(selectedOptions[quizIndex] ?? null);
+  }, [quizIndex, selectedOptions]);
+  async function retake() {
+    setStep(0);
+    setSelected(null);
+    setAnswers([]);
+    setSelectedOptions([]);
+    setWrittenResponses([]);
+    setAssessmentResult(null);
+    setCompletionError("");
+    setAssessmentAttemptId(null);
+    if (resumeKey) localStorage.removeItem(resumeKey);
+    if (writtenKey) localStorage.removeItem(writtenKey);
   }
   function submitShortAnswer(response) {
     const shortIndex = quiz.slice(0, quizIndex + 1).filter(question => question.type === "shortAnswer").length - 1;
@@ -1100,7 +1299,15 @@ function ModuleFlow({
         updatedAt: Date.now()
       }));
     }
-    if (session?.staffId && Number.isInteger(moduleId)) {
+    if (session?.staffId && Number.isInteger(moduleId) && assessmentAttemptId) {
+      callRpc("save_assessment_written_answer", {
+        p_attempt_id: assessmentAttemptId,
+        p_question_index: shortIndex,
+        p_answer: response
+      }).then(result => {
+        if (result.error || !result.data?.success) console.warn("Written answer was saved locally but not to the assessment attempt.", result.error || result.data);
+      });
+    } else if (session?.staffId && Number.isInteger(moduleId)) {
       callRpc("save_written_answer", {
         p_staff_id: session.staffId,
         p_module_id: moduleId,
@@ -1139,7 +1346,11 @@ function ModuleFlow({
       ...styles.progressFill,
       width: `${progressPct}%`
     }
-  })))), isManager && /*#__PURE__*/React.createElement("button", {
+  }))), /*#__PURE__*/React.createElement("button", {
+    style: styles.signOutBtn,
+    onClick: onLogout,
+    type: "button"
+  }, "Sign out")), isManager && /*#__PURE__*/React.createElement("button", {
     style: styles.courseDashboardBtn,
     onClick: onManagerDashboard,
     type: "button"
@@ -1162,6 +1373,7 @@ function ModuleFlow({
     data: moduleData.caseStudy,
     onNext: next
   }), inQuiz && /*#__PURE__*/React.createElement(QuizCard, {
+    key: quizIndex,
     data: quiz[quizIndex],
     index: quizIndex,
     count: quiz.length,
@@ -1172,9 +1384,14 @@ function ModuleFlow({
     onNext: next
   }), isComplete && /*#__PURE__*/React.createElement(Complete, {
     score: score,
-    total: getAutoGradedTotal(moduleData),
+    total: autoGradedTotal,
     writtenTotal: quiz.length - getAutoGradedTotal(moduleData),
     badgeTitle: moduleData.badgeTitle,
+    passed: passed,
+    result: assessmentResult,
+    error: completionError,
+    completing: completing,
+    onRetake: retake,
     onDone: onExit
   }), step > 0 && !isComplete && /*#__PURE__*/React.createElement("button", {
     onClick: previous,
@@ -1494,6 +1711,9 @@ function ShortAnswerCard({
 }) {
   const [draft, setDraft] = React.useState(answer || "");
   const submitted = typeof answer === "string";
+  React.useEffect(() => {
+    setDraft(answer || "");
+  }, [answer, data.q]);
   function submit() {
     const response = draft.trim();
     if (!response || submitted) return;
@@ -1548,11 +1768,13 @@ function ShortAnswerCard({
     className: "icon-sm"
   })));
 }
-function Complete({
+function LegacyComplete({
   score,
   total,
   writtenTotal,
   badgeTitle,
+  passed,
+  onRetake,
   onDone
 }) {
   return /*#__PURE__*/React.createElement("div", {
@@ -1564,9 +1786,9 @@ function Complete({
     className: "icon-xl"
   })), /*#__PURE__*/React.createElement("span", {
     style: styles.eyebrowLight
-  }, "BADGE EARNED"), /*#__PURE__*/React.createElement("h1", {
+  }, passed ? "BADGE EARNED" : "MODULE NOT PASSED"), /*#__PURE__*/React.createElement("h1", {
     style: styles.coverTitle
-  }, "Congratulations!"), /*#__PURE__*/React.createElement("h2", {
+  }, passed ? "Congratulations!" : "Keep practicing"), /*#__PURE__*/React.createElement("h2", {
     style: {
       ...styles.cardTitle,
       margin: 0
@@ -1586,6 +1808,14 @@ function Complete({
     name: "arrow",
     className: "icon-sm"
   })));
+}
+
+function Complete({ score, total, writtenTotal, badgeTitle, passed, result, error, completing, onRetake, onDone }) {
+  const mcqScore = result?.mcq_score ?? score;
+  const mcqTotal = result?.mcq_total ?? total;
+  const writtenScore = result?.written_score;
+  const writtenMax = result?.written_total;
+  return /*#__PURE__*/React.createElement("div", { style: styles.completeWrap }, /*#__PURE__*/React.createElement("div", { style: styles.badgeCircle }, /*#__PURE__*/React.createElement(Icon, { name: passed ? "badge" : "x", className: "icon-xl" })), /*#__PURE__*/React.createElement("span", { style: styles.eyebrowLight }, passed ? "BADGE EARNED" : "MODULE NOT PASSED"), /*#__PURE__*/React.createElement("h1", { style: styles.coverTitle }, passed ? "Congratulations!" : "Keep practicing"), /*#__PURE__*/React.createElement("h2", { style: { ...styles.cardTitle, margin: 0 } }, badgeTitle), completing ? /*#__PURE__*/React.createElement("p", { style: styles.coverSub }, "Marking your written answers and calculating your final result…") : error ? /*#__PURE__*/React.createElement("p", { style: { ...styles.coverSub, color: COLORS.chili } }, error) : /*#__PURE__*/React.createElement("p", { style: styles.coverSub }, "MCQ: ", mcqScore, "/", mcqTotal, ". Written: ", writtenScore, "/", writtenMax, ". Overall: ", result?.overall_percent, "%. The pass mark is 80%.", passed ? " Module passed — great work." : " You can retake the exam."), result && /*#__PURE__*/React.createElement("div", { style: styles.scoreBox }, /*#__PURE__*/React.createElement("span", { style: styles.scoreNum }, result.overall_percent, "%"), /*#__PURE__*/React.createElement("span", { style: styles.scoreLabel }, "Overall score")), !passed && !completing && /*#__PURE__*/React.createElement("button", { style: styles.primaryBtn, onClick: onRetake }, "Retake exam ", /*#__PURE__*/React.createElement(Icon, { name: "arrow", className: "icon-sm" })), !completing && /*#__PURE__*/React.createElement("button", { style: { ...styles.primaryBtn, ...(!passed ? { marginTop: 12 } : {}) }, onClick: onDone }, "Back to modules ", /*#__PURE__*/React.createElement(Icon, { name: "arrow", className: "icon-sm" })));
 }
 
 // =====================================================================
@@ -2043,8 +2273,10 @@ function ManagerDashboard({
   const [newPin, setNewPin] = React.useState("");
   const [newRole, setNewRole] = React.useState("staff");
   const [saving, setSaving] = React.useState(false);
+  const [notice, setNotice] = React.useState("");
   const [resetTarget, setResetTarget] = React.useState(null); // staff_id currently resetting
   const [resetPin, setResetPin] = React.useState("");
+  const [writtenAnswersRefresh, setWrittenAnswersRefresh] = React.useState(0);
   async function loadDashboard() {
     setError("");
     const {
@@ -2058,6 +2290,7 @@ function ManagerDashboard({
       return;
     }
     setRows(data);
+    setWrittenAnswersRefresh(version => version + 1);
   }
   React.useEffect(() => {
     loadDashboard();
@@ -2085,6 +2318,8 @@ function ManagerDashboard({
     setNewPin("");
     setNewRole("staff");
     setShowAddStaff(false);
+    setNotice(`${newName.trim()} has been created successfully.`);
+    setError("");
     loadDashboard();
   }
   async function handleResetPin(staffId) {
@@ -2120,8 +2355,8 @@ function ManagerDashboard({
     }
   });
   const staffList = Object.values(staffMap);
-  const [staffFilter, setStaffFilter] = React.useState("");
-  const filteredStaff = staffList.filter(s => s.full_name.toLowerCase().includes(staffFilter.toLowerCase()));
+  const [staffFilterId, setStaffFilterId] = React.useState("");
+  const filteredStaff = staffList.filter(s => !staffFilterId || s.staff_id === staffFilterId);
   const totalStaff = staffList.length;
   const completedModules = staffList.reduce((sum, s) => sum + MODULES.filter(m => s.byModule[m.id] === "complete").length, 0);
   const totalPossibleModules = totalStaff * MODULES.length;
@@ -2130,7 +2365,7 @@ function ManagerDashboard({
     const completed = staffList.filter(s => s.byModule[m.id] === "complete").length;
     return { ...m, completed, rate: totalStaff ? Math.round(completed / totalStaff * 100) : 0 };
   });
-  const selectedStaff = staffList.find(s => s.full_name === staffFilter);
+  const selectedStaff = staffList.find(s => s.staff_id === staffFilterId);
   const selectedRecords = selectedStaff ? Object.values(selectedStaff.records) : [];
   const selectedScores = selectedRecords.filter(r => Number.isFinite(Number(r.quiz_score)) && Number(r.quiz_total) > 0);
   const selectedAverageScore = selectedScores.length ? Math.round(selectedScores.reduce((sum, r) => sum + Number(r.quiz_score) / Number(r.quiz_total) * 100, 0) / selectedScores.length) : null;
@@ -2149,11 +2384,32 @@ function ManagerDashboard({
       setTrainerDrafts({});
       setWrittenAnswerError("");
       if (!selectedStaff?.staff_id) return;
-      const { data, error: rpcError } = await callRpc("manager_written_answers", {
+      const { data: attempts, error: attemptError } = await callRpc("manager_assessment_attempts", {
         p_restaurant_id: RESTAURANT_ID,
         p_staff_id: selectedStaff.staff_id,
         p_module_id: 1
       });
+      let data = null;
+      let rpcError = attemptError;
+      if (!attemptError && attempts?.length) {
+        const latestAttempt = attempts[0];
+        const current = await callRpc("manager_assessment_written_answers", {
+          p_restaurant_id: RESTAURANT_ID,
+          p_staff_id: selectedStaff.staff_id,
+          p_module_id: 1,
+          p_attempt_id: latestAttempt.id
+        });
+        data = current.data;
+        rpcError = current.error;
+      } else if (attemptError) {
+        const legacy = await callRpc("manager_written_answers", {
+          p_restaurant_id: RESTAURANT_ID,
+          p_staff_id: selectedStaff.staff_id,
+          p_module_id: 1
+        });
+        data = legacy.data;
+        rpcError = legacy.error;
+      }
       if (!active) return;
       if (rpcError) {
         setWrittenAnswerError(rpcError.message || "Could not load written answers.");
@@ -2175,7 +2431,7 @@ function ManagerDashboard({
     return () => {
       active = false;
     };
-  }, [selectedStaff?.staff_id]);
+  }, [selectedStaff?.staff_id, writtenAnswersRefresh]);
   async function runAiMark(questionIndex) {
     const answer = selectedModule1Answers[questionIndex];
     const item = MODULE_1_REVIEW[questionIndex];
@@ -2268,7 +2524,7 @@ function ManagerDashboard({
     }
   }, /*#__PURE__*/React.createElement("p", {
     style: styles.feedbackText
-  }, error)), rows && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
+  }, error)), notice && /*#__PURE__*/React.createElement("div", { style: { ...styles.feedbackBox, ...styles.feedbackGood, marginBottom: 14 } }, /*#__PURE__*/React.createElement("p", { style: styles.feedbackText }, notice)), rows && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
     style: { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(125px, 1fr))", gap: 10, marginBottom: 18 }
   }, [{ label: "Staff", value: totalStaff, description: "Number of people with staff accounts" }, { label: "Completion", value: `${completionRate}%`, description: "Percentage of assigned modules completed" }, { label: "Modules done", value: completedModules, description: "Completed modules across the team" }].map(card => /*#__PURE__*/React.createElement("div", {
     key: card.label,
@@ -2284,11 +2540,11 @@ function ManagerDashboard({
     style: { display: "flex", gap: 8, alignItems: "center", marginBottom: 12 }
   }, /*#__PURE__*/React.createElement("select", {
     style: { ...styles.textInput, padding: "10px 12px" },
-    value: staffFilter,
-    onChange: e => setStaffFilter(e.target.value),
+    value: staffFilterId,
+    onChange: e => setStaffFilterId(e.target.value),
   }, /*#__PURE__*/React.createElement("option", { value: "" }, "All staff"), staffList.map(s => /*#__PURE__*/React.createElement("option", {
     key: s.staff_id,
-    value: s.full_name
+    value: s.staff_id
   }, s.full_name))), /*#__PURE__*/React.createElement("button", {
     style: { ...styles.secondaryBtn, width: "auto", padding: "10px 14px" },
     onClick: loadDashboard
@@ -2543,7 +2799,7 @@ function Home({
     style: styles.moduleList
   }, MODULES.map(m => {
     const isDone = completedIds.includes(m.id);
-    const isUnlocked = m.id === 1 || completedIds.includes(m.id - 1);
+    const isUnlocked = !isDone && (m.id === 1 || completedIds.includes(m.id - 1));
     const resumeKey = `karibu-training:${RESTAURANT_ID}:${session?.staffId}:module:${m.id}`;
     const hasResume = !isDone && Boolean(localStorage.getItem(resumeKey));
     return /*#__PURE__*/React.createElement("button", {
@@ -2582,6 +2838,13 @@ function Home({
 // =====================================================================
 // APP ROOT
 // =====================================================================
+function SignOutButton({ onLogout }) {
+  return /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    onClick: onLogout,
+    style: styles.globalSignOutBtn
+  }, "Sign out");
+}
 function App() {
   if (RESTAURANT_ROUTE_ERROR) {
     return /*#__PURE__*/React.createElement("div", {
@@ -2719,18 +2982,23 @@ function App() {
     setScreen("home");
     setActiveMod(null);
   }
-  async function finishModule(moduleId, score, total) {
-    setCompletedIds(ids => ids.includes(moduleId) ? ids : [...ids, moduleId]);
+  async function finishModule(moduleId, score, total, passed) {
+    if (passed) {
+      setCompletedIds(ids => ids.includes(moduleId) ? ids : [...ids, moduleId]);
+    } else {
+      setCompletedIds(ids => ids.filter(id => id !== moduleId));
+    }
     try {
       const completedKey = `karibu-completed:${RESTAURANT_ID}:${session?.staffId}`;
       const current = JSON.parse(localStorage.getItem(completedKey) || "[]");
-      if (!current.includes(moduleId)) localStorage.setItem(completedKey, JSON.stringify([...current, moduleId]));
+      const next = passed ? [...new Set([...current, moduleId])] : current.filter(id => id !== moduleId);
+      localStorage.setItem(completedKey, JSON.stringify(next));
     } catch (_) {}
     if (session) {
       await callRpc("upsert_progress", {
         p_staff_id: session.staffId,
         p_module_id: moduleId,
-        p_status: "complete",
+        p_status: passed ? "complete" : "in_progress",
         p_quiz_score: score,
         p_quiz_total: total
       });
@@ -2739,7 +3007,7 @@ function App() {
   return /*#__PURE__*/React.createElement("div", {
     className: "app-page",
     style: styles.page
-  }, /*#__PURE__*/React.createElement("style", null, fontImport), /*#__PURE__*/React.createElement("div", {
+  }, /*#__PURE__*/React.createElement("style", null, fontImport), session && /*#__PURE__*/React.createElement(SignOutButton, { onLogout: handleLogout }), /*#__PURE__*/React.createElement("div", {
     className: "app-shell",
     style: styles.phone
   }, screen === "login" && /*#__PURE__*/React.createElement(Login, {
@@ -2771,9 +3039,10 @@ function App() {
     session: session,
     onExit: exitToHome,
     resumeKey: `karibu-training:${RESTAURANT_ID}:${session?.staffId}:module:${activeMod.id}`,
-    onFinish: score => finishModule(activeMod.id, score, getAutoGradedTotal(MODULE_DATA[activeMod.id])),
+    onFinish: (score, total, passed) => finishModule(activeMod.id, score, total, passed),
     isManager: session?.role === "manager",
-    onManagerDashboard: () => setScreen("manager-dashboard")
+    onManagerDashboard: () => setScreen("manager-dashboard"),
+    onLogout: handleLogout
   }), screen === "coming-soon" && activeMod && /*#__PURE__*/React.createElement(ComingSoon, {
     mod: activeMod,
     onExit: exitToHome
@@ -2868,6 +3137,19 @@ const COLORS = {
   tan: "#D8CBB5" // accessible secondary text on dark backgrounds (8:1 contrast)
 };
 const styles = {
+  globalSignOutBtn: {
+    position: "fixed",
+    top: 14,
+    right: 14,
+    zIndex: 20,
+    border: "1px solid rgba(255,255,255,0.28)",
+    borderRadius: 999,
+    padding: "7px 12px",
+    background: "rgba(43,36,32,0.86)",
+    color: "#fff",
+    fontSize: "0.75rem",
+    cursor: "pointer"
+  },
   page: {
     minHeight: "100vh",
     background: `linear-gradient(180deg, ${COLORS.espresso}, #171310)`,

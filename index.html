@@ -1075,6 +1075,7 @@ function ModuleFlow({
   session,
   onExit,
   onFinish,
+  onNextModule,
   resumeKey,
   isManager,
   onManagerDashboard,
@@ -1095,6 +1096,7 @@ function ModuleFlow({
   const [assessmentResult, setAssessmentResult] = React.useState(null);
   const [completionError, setCompletionError] = React.useState("");
   const [completing, setCompleting] = React.useState(false);
+  const pendingAnswerSaves = React.useRef([]);
   const writtenKey = resumeKey ? resumeKey.replace("karibu-training:", "karibu-written:") : null;
   const [writtenResponses, setWrittenResponses] = React.useState(() => {
     try {
@@ -1182,6 +1184,15 @@ function ModuleFlow({
   }
   async function next() {
     if (completing) return;
+    if (pendingAnswerSaves.current.length) {
+      const saves = await Promise.all(pendingAnswerSaves.current);
+      pendingAnswerSaves.current = [];
+      const failedSave = saves.find(result => result?.error || !result?.data?.success);
+      if (failedSave) {
+        setCompletionError(failedSave.error?.message || failedSave.data?.error || "Your last answer could not be saved. Please try again.");
+        return;
+      }
+    }
     const ns = Math.min(step + 1, TOTAL_STEPS - 1);
     if (ns === TOTAL_STEPS - 1) {
       await completeAssessment();
@@ -1206,13 +1217,11 @@ function ModuleFlow({
       return copy;
     });
     if (assessmentAttemptId && session?.staffId) {
-      callRpc("save_mcq_answer", {
+      pendingAnswerSaves.current.push(callRpc("save_mcq_answer", {
         p_attempt_id: assessmentAttemptId,
         p_question_index: quizIndex,
         p_selected_option_index: optIdx
-      }).then(result => {
-        if (result.error || !result.data?.success) console.warn("MCQ answer was saved locally but not to the assessment attempt.", result.error || result.data);
-      });
+      }));
     }
   }
   React.useEffect(() => {
@@ -1243,13 +1252,11 @@ function ModuleFlow({
       }));
     }
     if (session?.staffId && Number.isInteger(moduleId) && assessmentAttemptId) {
-      callRpc("save_assessment_written_answer", {
+      pendingAnswerSaves.current.push(callRpc("save_assessment_written_answer", {
         p_attempt_id: assessmentAttemptId,
         p_question_index: shortIndex,
         p_answer: response
-      }).then(result => {
-        if (result.error || !result.data?.success) console.warn("Written answer was saved locally but not to the assessment attempt.", result.error || result.data);
-      });
+      }));
     } else if (session?.staffId && Number.isInteger(moduleId)) {
       callRpc("save_written_answer", {
         p_staff_id: session.staffId,
@@ -1335,7 +1342,8 @@ function ModuleFlow({
     error: completionError,
     completing: completing,
     onRetake: retake,
-    onDone: onExit
+    onDone: onExit,
+    onNextModule
   }), step > 0 && !isComplete && /*#__PURE__*/React.createElement("button", {
     onClick: previous,
     style: {
@@ -1731,12 +1739,12 @@ function LegacyComplete({
   })));
 }
 
-function Complete({ score, total, writtenTotal, badgeTitle, passed, result, error, completing, onRetake, onDone }) {
+function Complete({ score, total, writtenTotal, badgeTitle, passed, result, error, completing, onRetake, onDone, onNextModule }) {
   const mcqScore = result?.mcq_score ?? score;
   const mcqTotal = result?.mcq_total ?? total;
   const writtenScore = result?.written_score;
   const writtenMax = result?.written_total;
-  return /*#__PURE__*/React.createElement("div", { style: styles.completeWrap }, /*#__PURE__*/React.createElement("div", { style: styles.badgeCircle }, /*#__PURE__*/React.createElement(Icon, { name: passed ? "badge" : "x", className: "icon-xl" })), /*#__PURE__*/React.createElement("span", { style: styles.eyebrowLight }, passed ? "BADGE EARNED" : "MODULE NOT PASSED"), /*#__PURE__*/React.createElement("h1", { style: styles.coverTitle }, passed ? "Congratulations!" : "Keep practicing"), /*#__PURE__*/React.createElement("h2", { style: { ...styles.cardTitle, margin: 0 } }, badgeTitle), completing ? /*#__PURE__*/React.createElement("p", { style: styles.coverSub }, "Marking your written answers and calculating your final result…") : error ? /*#__PURE__*/React.createElement("p", { style: { ...styles.coverSub, color: COLORS.chili } }, error) : /*#__PURE__*/React.createElement("p", { style: styles.coverSub }, "MCQ: ", mcqScore, "/", mcqTotal, ". Written: ", writtenScore, "/", writtenMax, ". Overall: ", result?.overall_percent, "%. The pass mark is 80%.", passed ? " Module passed — great work." : " You can retake the exam."), result && /*#__PURE__*/React.createElement("div", { style: styles.scoreBox }, /*#__PURE__*/React.createElement("span", { style: styles.scoreNum }, result.overall_percent, "%"), /*#__PURE__*/React.createElement("span", { style: styles.scoreLabel }, "Overall score")), !passed && !completing && /*#__PURE__*/React.createElement("button", { style: styles.primaryBtn, onClick: onRetake }, "Retake exam ", /*#__PURE__*/React.createElement(Icon, { name: "arrow", className: "icon-sm" })), !completing && /*#__PURE__*/React.createElement("button", { style: { ...styles.primaryBtn, ...(!passed ? { marginTop: 12 } : {}) }, onClick: onDone }, "Back to modules ", /*#__PURE__*/React.createElement(Icon, { name: "arrow", className: "icon-sm" })));
+  return /*#__PURE__*/React.createElement("div", { style: styles.completeWrap }, /*#__PURE__*/React.createElement("div", { style: styles.badgeCircle }, /*#__PURE__*/React.createElement(Icon, { name: passed ? "badge" : "x", className: "icon-xl" })), /*#__PURE__*/React.createElement("span", { style: styles.eyebrowLight }, passed ? "BADGE EARNED" : "MODULE NOT PASSED"), /*#__PURE__*/React.createElement("h1", { style: styles.coverTitle }, passed ? "Congratulations!" : "Keep practicing"), /*#__PURE__*/React.createElement("h2", { style: { ...styles.cardTitle, margin: 0 } }, badgeTitle), completing ? /*#__PURE__*/React.createElement("p", { style: styles.coverSub }, "Marking your written answers and calculating your final result…") : error ? /*#__PURE__*/React.createElement("p", { style: { ...styles.coverSub, color: COLORS.chili } }, error) : /*#__PURE__*/React.createElement("p", { style: styles.coverSub }, "MCQ: ", mcqScore, "/", mcqTotal, ". Written: ", writtenScore, "/", writtenMax, ". Overall: ", result?.overall_percent, "%. The pass mark is 80%.", passed ? " Module passed — great work." : " You can retake the exam."), result && /*#__PURE__*/React.createElement("div", { style: styles.scoreBox }, /*#__PURE__*/React.createElement("span", { style: styles.scoreNum }, result.overall_percent, "%"), /*#__PURE__*/React.createElement("span", { style: styles.scoreLabel }, "Overall score")), !passed && !completing && /*#__PURE__*/React.createElement("button", { style: styles.primaryBtn, onClick: onRetake }, "Retake exam ", /*#__PURE__*/React.createElement(Icon, { name: "arrow", className: "icon-sm" })), !completing && passed && onNextModule && /*#__PURE__*/React.createElement("button", { style: { ...styles.primaryBtn, marginTop: 12 }, onClick: onNextModule }, "Continue to next module ", /*#__PURE__*/React.createElement(Icon, { name: "arrow", className: "icon-sm" })), !completing && /*#__PURE__*/React.createElement("button", { style: { ...styles.primaryBtn, ...(!passed ? { marginTop: 12 } : { marginTop: 12 }) }, onClick: onDone }, "Back to modules ", /*#__PURE__*/React.createElement(Icon, { name: "arrow", className: "icon-sm" })));
 }
 
 // =====================================================================
@@ -2899,6 +2907,15 @@ function App() {
     setScreen("home");
     setActiveMod(null);
   }
+  function continueToNextModule(moduleId) {
+    const nextModule = MODULES.find(module => module.id === moduleId + 1 && module.available);
+    if (nextModule) {
+      setActiveMod(nextModule);
+      setScreen("module");
+    } else {
+      exitToHome();
+    }
+  }
   async function finishModule(moduleId, score, total, passed) {
     if (passed) {
       setCompletedIds(ids => ids.includes(moduleId) ? ids : [...ids, moduleId]);
@@ -2950,6 +2967,7 @@ function App() {
     onExit: exitToHome,
     resumeKey: `karibu-training:${RESTAURANT_ID}:${session?.staffId}:module:${activeMod.id}`,
     onFinish: (score, total, passed) => finishModule(activeMod.id, score, total, passed),
+    onNextModule: () => continueToNextModule(activeMod.id),
     isManager: session?.role === "manager",
     onManagerDashboard: () => setScreen("manager-dashboard"),
     onLogout: handleLogout

@@ -13,9 +13,9 @@ Netlify runs `npm run build`, which generates the ignored `runtime-config.js` fi
 
 ## Database migrations
 
-Run the SQL files in order: `01_schema.sql` through `08_security_and_review_fixes.sql`. Run `04_verification.sql` after the first three migrations, then run the extended checks in `09_security_verification.sql` after all migrations. Always back up the database before applying migrations 05–08.
+Run the SQL files in order: `01_schema.sql` through `08_security_and_review_fixes.sql`, then `10_manager_review_fixes.sql`. Run `04_verification.sql` after the first three migrations, then run the extended checks in `09_security_verification.sql` after all migrations. Always back up the database before applying migrations 05–08.
 
-The final migration adds tenant ownership, server-authoritative progression, sequential module locking, preservation of earned completions, attempt-specific manager review functions, and the `trial` payment status.
+The security migration adds tenant ownership, server-authoritative progression, sequential module locking, preservation of earned completions, attempt-specific manager review functions, and the `trial` payment status. Migration `10_manager_review_fixes.sql` adds selected-attempt recalculation and manager audit-history access. If migration 08 is already installed, run migration 10 only; do not rerun 08 just to enable the manager review additions.
 
 Routes:
 

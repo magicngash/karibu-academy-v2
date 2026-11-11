@@ -764,7 +764,7 @@ const WRITTEN_REVIEW = {
 
 // Local AI-assist prototype for the pilot review. Each criterion is checked
 // against the learner's wording and produces a suggested 0-2 score. The
-// trainer remains the final decision-maker.
+// Assessment results are generated and stored by the protected marking flow.
 const scoreModule1Answer = (answer, item) => {
   const text = String(answer || "").toLowerCase();
   if (!text.trim()) return { score: null, feedback: "No answer was submitted." };
@@ -2298,7 +2298,6 @@ function ManagerDashboard({
   const [selectedModule1Answers, setSelectedModule1Answers] = React.useState([]);
   const [selectedModule1Reviews, setSelectedModule1Reviews] = React.useState([]);
   const [reviewAuditEvents, setReviewAuditEvents] = React.useState([]);
-  const [trainerDrafts, setTrainerDrafts] = React.useState({});
   const [writtenAnswerError, setWrittenAnswerError] = React.useState("");
   const [reviewBusy, setReviewBusy] = React.useState("");
   React.useEffect(() => {
@@ -2334,7 +2333,6 @@ function ManagerDashboard({
       setSelectedModule1Answers([]);
       setSelectedModule1Reviews([]);
       setReviewAuditEvents([]);
-      setTrainerDrafts({});
       if (!selectedStaff?.staff_id || !selectedAttemptId) return;
       const [answersResult, auditResult] = await Promise.all([
         callRpc("manager_assessment_written_answers", {
@@ -2352,15 +2350,12 @@ function ManagerDashboard({
       }
       const responses = [];
       const reviewsByIndex = [];
-      const drafts = {};
       (answersResult.data || []).forEach(item => {
         responses[item.question_index] = item.answer;
         reviewsByIndex[item.question_index] = item;
-        drafts[item.question_index] = item.trainer_score == null ? "" : String(item.trainer_score);
       });
       setSelectedModule1Answers(responses);
       setSelectedModule1Reviews(reviewsByIndex);
-      setTrainerDrafts(drafts);
       if (!auditResult.error) setReviewAuditEvents(auditResult.data || []);
     }
     loadSelectedAttempt();
@@ -2384,37 +2379,16 @@ function ManagerDashboard({
       if (!response.ok) throw new Error(result?.error || "Automatic system marking failed.");
       setWrittenAnswersRefresh(value => value + 1);
     } catch (error) {
-      setWrittenAnswerError(error.message || "Could not run automatic system marking.");
+      setWrittenAnswerError(error.message || "Could not assess this answer.");
     } finally {
       setReviewBusy("");
     }
-  }
-  async function saveTrainerMark(questionIndex, score, feedback) {
-    if (!selectedAttemptId) return;
-    setTrainerDrafts(previous => ({ ...previous, [questionIndex]: score === "" ? "" : String(score) }));
-    setReviewBusy(`trainer-${questionIndex}`);
-    const { data, error: rpcError } = await callRpc("review_assessment_written_answer", {
-      p_attempt_id: selectedAttemptId,
-      p_question_index: questionIndex,
-      p_trainer_score: score === "" ? null : Number(score),
-      p_trainer_feedback: feedback || null
-    });
-    if (!rpcError && data?.success) {
-      const recalculated = await callRpc("recalculate_assessment_attempt", { p_attempt_id: selectedAttemptId });
-      if (recalculated.error || !recalculated.data?.success) {
-        setWrittenAnswerError(recalculated.error?.message || recalculated.data?.error || "Mark saved, but the attempt total could not be recalculated.");
-      }
-    } else {
-      setWrittenAnswerError(rpcError?.message || data?.error || "Could not save trainer marking.");
-    }
-    setReviewBusy("");
-    setWrittenAnswersRefresh(value => value + 1);
   }
   const selectedAttempt = reviewAttempts.find(attempt => attempt.id === selectedAttemptId) || null;
   const selectedModule1Record = selectedStaff?.records?.[selectedReviewModule] || {};
   const selectedModule1McqScore = selectedAttempt?.mcq_score != null ? Number(selectedAttempt.mcq_score) : (Number.isFinite(Number(selectedModule1Record.quiz_score)) ? Number(selectedModule1Record.quiz_score) : 0);
   const selectedModule1McqTotal = selectedAttempt?.mcq_total != null ? Number(selectedAttempt.mcq_total) : (Number(selectedModule1Record.quiz_total) > 0 ? Number(selectedModule1Record.quiz_total) : 0);
-  const selectedModule1WrittenScore = selectedAttempt?.written_score != null ? Number(selectedAttempt.written_score) : selectedModule1Reviews.reduce((sum, review) => sum + (review?.trainer_score != null ? Number(review.trainer_score) : review?.ai_score != null ? Number(review.ai_score) : 0), 0);
+  const selectedModule1WrittenScore = selectedAttempt?.written_score != null ? Number(selectedAttempt.written_score) : selectedModule1Reviews.reduce((sum, review) => sum + (review?.ai_score != null ? Number(review.ai_score) : 0), 0);
   const selectedModule1OverallTotal = selectedAttempt?.written_total != null ? selectedModule1McqTotal + Number(selectedAttempt.written_total) : selectedModule1McqTotal + WRITTEN_REVIEW[selectedReviewModule].length * 2;
   const selectedModule1OverallScore = selectedAttempt?.overall_percent != null ? Number(selectedAttempt.overall_percent) : (selectedModule1OverallTotal > 0 ? Math.round((selectedModule1McqScore + selectedModule1WrittenScore) / selectedModule1OverallTotal * 100) : null);
   return /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
@@ -2485,9 +2459,9 @@ function ManagerDashboard({
     style: { ...styles.syllabusBox, marginBottom: 16, border: `2px solid ${COLORS.avocado}` }
   }, /*#__PURE__*/React.createElement("span", { style: styles.objLabel }, `Module ${selectedReviewModule} written-answer review`), /*#__PURE__*/React.createElement("p", {
     style: { ...styles.moduleCardBlurb, margin: "6px 0 14px", lineHeight: 1.45 }
-  }, "Select a module and attempt to review every written answer, AI mark, trainer override, final result, and audit event."), /*#__PURE__*/React.createElement("div", { style: { display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center", margin: "10px 0" } }, /*#__PURE__*/React.createElement("label", { style: { display: "flex", alignItems: "center", gap: 6 } }, "Module", /*#__PURE__*/React.createElement("select", { value: selectedReviewModule, onChange: e => setSelectedReviewModule(Number(e.target.value)), style: styles.textInput }, MODULES.map(m => /*#__PURE__*/React.createElement("option", { key: m.id, value: m.id }, `Module ${m.id}`)))), /*#__PURE__*/React.createElement("label", { style: { display: "flex", alignItems: "center", gap: 6 } }, "Attempt", /*#__PURE__*/React.createElement("select", { value: selectedAttemptId || "", onChange: e => setSelectedAttemptId(e.target.value || null), style: styles.textInput }, reviewAttempts.length ? reviewAttempts.map(attempt => /*#__PURE__*/React.createElement("option", { key: attempt.id, value: attempt.id }, `Attempt ${attempt.attempt_number} · ${attempt.status} · ${attempt.overall_percent == null ? "Not scored" : `${attempt.overall_percent}%`}`)) : /*#__PURE__*/React.createElement("option", { value: "" }, "No attempts")))), selectedAttempt && /*#__PURE__*/React.createElement("div", { style: { display: "flex", flexWrap: "wrap", gap: 12, margin: "10px 0 14px", padding: "10px 12px", background: "#F1E9DA", borderRadius: 10 } }, /*#__PURE__*/React.createElement("strong", null, `Attempt ${selectedAttempt.attempt_number}: ${selectedAttempt.status}`), /*#__PURE__*/React.createElement("span", null, `Overall ${selectedModule1OverallScore == null ? "Not scored" : `${selectedModule1OverallScore}%`}`), /*#__PURE__*/React.createElement("span", null, `MCQ ${selectedModule1McqScore}/${selectedModule1McqTotal || "—"} · Written ${selectedModule1WrittenScore}/${selectedAttempt.written_total || WRITTEN_REVIEW[selectedReviewModule].length * 2}`), /*#__PURE__*/React.createElement("span", { style: { color: selectedAttempt.passed ? COLORS.avocado : COLORS.stone, fontWeight: 700 } }, selectedAttempt.passed ? "Passed" : selectedAttempt.status === "failed" ? "Not passed" : "Awaiting marking")), writtenAnswerError && /*#__PURE__*/React.createElement("p", { style: { ...styles.feedbackText, color: COLORS.chili } }, writtenAnswerError), WRITTEN_REVIEW[selectedReviewModule].map((item, questionIndex) => {
+  }, "Select a module and attempt to review each written answer, assessment result, and audit event."), /*#__PURE__*/React.createElement("div", { style: { display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center", margin: "10px 0" } }, /*#__PURE__*/React.createElement("label", { style: { display: "flex", alignItems: "center", gap: 6 } }, "Module", /*#__PURE__*/React.createElement("select", { value: selectedReviewModule, onChange: e => setSelectedReviewModule(Number(e.target.value)), style: styles.textInput }, MODULES.map(m => /*#__PURE__*/React.createElement("option", { key: m.id, value: m.id }, `Module ${m.id}`)))), /*#__PURE__*/React.createElement("label", { style: { display: "flex", alignItems: "center", gap: 6 } }, "Attempt", /*#__PURE__*/React.createElement("select", { value: selectedAttemptId || "", onChange: e => setSelectedAttemptId(e.target.value || null), style: styles.textInput }, reviewAttempts.length ? reviewAttempts.map(attempt => /*#__PURE__*/React.createElement("option", { key: attempt.id, value: attempt.id }, `Attempt ${attempt.attempt_number} · ${attempt.status} · ${attempt.overall_percent == null ? "Not scored" : `${attempt.overall_percent}%`}`)) : /*#__PURE__*/React.createElement("option", { value: "" }, "No attempts")))), selectedAttempt && /*#__PURE__*/React.createElement("div", { style: { display: "flex", flexWrap: "wrap", gap: 12, margin: "10px 0 14px", padding: "10px 12px", background: "#F1E9DA", borderRadius: 10 } }, /*#__PURE__*/React.createElement("strong", null, `Attempt ${selectedAttempt.attempt_number}: ${selectedAttempt.status}`), /*#__PURE__*/React.createElement("span", null, `Overall ${selectedModule1OverallScore == null ? "Not scored" : `${selectedModule1OverallScore}%`}`), /*#__PURE__*/React.createElement("span", null, `MCQ ${selectedModule1McqScore}/${selectedModule1McqTotal || "—"} · Written ${selectedModule1WrittenScore}/${selectedAttempt.written_total || WRITTEN_REVIEW[selectedReviewModule].length * 2}`), /*#__PURE__*/React.createElement("span", { style: { color: selectedAttempt.passed ? COLORS.avocado : COLORS.stone, fontWeight: 700 } }, selectedAttempt.passed ? "Passed" : selectedAttempt.status === "failed" ? "Not passed" : "Awaiting marking")), writtenAnswerError && /*#__PURE__*/React.createElement("p", { style: { ...styles.feedbackText, color: COLORS.chili } }, writtenAnswerError), WRITTEN_REVIEW[selectedReviewModule].map((item, questionIndex) => {
     const review = selectedModule1Reviews[questionIndex] || {};
-    return /*#__PURE__*/React.createElement("div", { key: item.q, style: { borderTop: questionIndex ? "1px solid #E3D8C5" : "none", paddingTop: questionIndex ? 16 : 0, marginTop: questionIndex ? 16 : 0 } }, /*#__PURE__*/React.createElement("span", { style: styles.moduleCardTitle }, "Question ", questionIndex + 1), /*#__PURE__*/React.createElement("p", { style: { ...styles.bodyText, margin: "6px 0" } }, item.q), /*#__PURE__*/React.createElement("p", { style: { margin: "8px 0", color: COLORS.stone, fontSize: "0.9rem" } }, /*#__PURE__*/React.createElement("strong", null, "Staff answer: "), selectedModule1Answers[questionIndex] || "No submitted answer yet."), /*#__PURE__*/React.createElement("div", { style: { display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center", color: COLORS.stone, fontSize: "0.85rem" } }, /*#__PURE__*/React.createElement("span", null, "AI: ", review.ai_score == null ? "Not run" : `${review.ai_score}/2`), /*#__PURE__*/React.createElement("button", { style: { ...styles.secondaryBtn, width: "auto", padding: "7px 10px", margin: 0 }, disabled: !selectedAttemptId || !selectedModule1Answers[questionIndex] || Boolean(reviewBusy), onClick: () => runAiMark(questionIndex) }, reviewBusy === `ai-${questionIndex}` ? "Marking…" : "Run AI marking"), /*#__PURE__*/React.createElement("span", null, "Final: ", review.trainer_score != null ? `${review.trainer_score}/2` : review.ai_score != null ? `${review.ai_score}/2` : "Not scored")), review.ai_feedback && /*#__PURE__*/React.createElement("p", { style: { margin: "6px 0", color: COLORS.stone, fontSize: "0.85rem" } }, review.ai_feedback), /*#__PURE__*/React.createElement("div", { style: { display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center", marginTop: 8 } }, /*#__PURE__*/React.createElement("select", { value: trainerDrafts[questionIndex] ?? "", onChange: e => setTrainerDrafts(previous => ({ ...previous, [questionIndex]: e.target.value })), style: { ...styles.textInput, width: 90, padding: "7px 8px" } }, /*#__PURE__*/React.createElement("option", { value: "" }, "Final"), /*#__PURE__*/React.createElement("option", { value: "0" }, "0 / 2"), /*#__PURE__*/React.createElement("option", { value: "1" }, "1 / 2"), /*#__PURE__*/React.createElement("option", { value: "2" }, "2 / 2")), /*#__PURE__*/React.createElement("button", { style: { ...styles.primaryBtn, width: "auto", padding: "7px 10px", margin: 0 }, disabled: !selectedAttemptId || Boolean(reviewBusy), onClick: () => saveTrainerMark(questionIndex, trainerDrafts[questionIndex] ?? "", review.trainer_feedback || "") }, reviewBusy === `trainer-${questionIndex}` ? "Saving…" : "Save trainer score"), review.trainer_feedback && /*#__PURE__*/React.createElement("span", { style: { color: COLORS.stone, fontSize: "0.8rem" } }, review.trainer_feedback)));
+    return /*#__PURE__*/React.createElement("div", { key: item.q, style: { borderTop: questionIndex ? "1px solid #E3D8C5" : "none", paddingTop: questionIndex ? 16 : 0, marginTop: questionIndex ? 16 : 0 } }, /*#__PURE__*/React.createElement("span", { style: styles.moduleCardTitle }, "Question ", questionIndex + 1), /*#__PURE__*/React.createElement("p", { style: { ...styles.bodyText, margin: "6px 0" } }, item.q), /*#__PURE__*/React.createElement("p", { style: { margin: "8px 0", color: COLORS.stone, fontSize: "0.9rem" } }, /*#__PURE__*/React.createElement("strong", null, "Staff answer: "), selectedModule1Answers[questionIndex] || "No submitted answer yet."), /*#__PURE__*/React.createElement("div", { style: { display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center", color: COLORS.stone, fontSize: "0.85rem" } }, /*#__PURE__*/React.createElement("strong", null, "Assessment score: "), review.ai_score == null ? "Not assessed" : `${review.ai_score}/2`, /*#__PURE__*/React.createElement("button", { style: { ...styles.secondaryBtn, width: "auto", padding: "7px 10px", margin: 0 }, disabled: !selectedAttemptId || !selectedModule1Answers[questionIndex] || Boolean(reviewBusy), onClick: () => runAiMark(questionIndex) }, reviewBusy === `ai-${questionIndex}` ? "Assessing…" : "Assess answer")), review.ai_feedback && /*#__PURE__*/React.createElement("p", { style: { margin: "6px 0", color: COLORS.stone, fontSize: "0.85rem" } }, /*#__PURE__*/React.createElement("strong", null, "Feedback: "), review.ai_feedback));
   }), selectedAttempt && /*#__PURE__*/React.createElement("div", { style: { marginTop: 18, borderTop: "1px solid #E3D8C5", paddingTop: 12 } }, /*#__PURE__*/React.createElement("span", { style: styles.objLabel }, "Audit history"), reviewAuditEvents.length ? reviewAuditEvents.map(event => /*#__PURE__*/React.createElement("p", { key: event.id, style: { ...styles.moduleCardBlurb, margin: "6px 0" } }, new Date(event.created_at).toLocaleString(), " · ", event.event_type, event.details?.overall_percent != null ? ` · ${event.details.overall_percent}%` : "")) : /*#__PURE__*/React.createElement("p", { style: styles.moduleCardBlurb }, "No audit events recorded."))), !rows && !error && /*#__PURE__*/React.createElement("p", {
     style: styles.bodyText
   }, "Loading staff progress..."), rows && /*#__PURE__*/React.createElement("div", {

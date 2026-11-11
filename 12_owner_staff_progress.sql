@@ -12,7 +12,7 @@ language sql security definer set search_path=public,private,pg_temp as $$
   left join public.module_progress p on p.staff_id=s.id
   where s.restaurant_id=p_restaurant_id
     and exists(
-      select 1 from private.auth(a)
+      select 1 from private.auth(p_auth_token) a
       join public.owner_restaurants x on x.owner_id=a.principal_id and x.restaurant_id=p_restaurant_id
       where a.principal_type='owner'
     )
@@ -33,7 +33,7 @@ language sql security definer set search_path=public,private,pg_temp as $$
   where a.staff_id=p_staff_id
     and a.module_id=p_module_id
     and exists(
-      select 1 from private.auth(x)
+      select 1 from private.auth(p_auth_token) x
       join public.owner_restaurants o on o.owner_id=x.principal_id and o.restaurant_id=p_restaurant_id
       where x.principal_type='owner'
     )
@@ -55,7 +55,7 @@ language sql security definer set search_path=public,private,pg_temp as $$
   join public.staff target on target.id=a.staff_id and target.restaurant_id=p_restaurant_id
   where a.id=p_attempt_id and a.staff_id=p_staff_id and a.module_id=p_module_id
     and exists(
-      select 1 from private.auth(x)
+      select 1 from private.auth(p_auth_token) x
       join public.owner_restaurants o on o.owner_id=x.principal_id and o.restaurant_id=p_restaurant_id
       where x.principal_type='owner'
     )
@@ -75,7 +75,7 @@ language sql security definer set search_path=public,private,pg_temp as $$
   join public.staff target on target.id=a.staff_id and target.restaurant_id=p_restaurant_id
   where e.attempt_id=p_attempt_id
     and exists(
-      select 1 from private.auth(x)
+      select 1 from private.auth(p_auth_token) x
       join public.owner_restaurants o on o.owner_id=x.principal_id and o.restaurant_id=p_restaurant_id
       where x.principal_type='owner'
     )

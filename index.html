@@ -1095,6 +1095,7 @@ function ModuleFlow({
   const [assessmentAttemptId, setAssessmentAttemptId] = React.useState(() => savedProgress?.assessmentAttemptId || null);
   const [assessmentResult, setAssessmentResult] = React.useState(null);
   const [completionError, setCompletionError] = React.useState("");
+  const [completionStatus, setCompletionStatus] = React.useState("");
   const [completing, setCompleting] = React.useState(false);
   const pendingAnswerSaves = React.useRef([]);
   const writtenKey = resumeKey ? resumeKey.replace("karibu-training:", "karibu-written:") : null;
@@ -1154,11 +1155,13 @@ function ModuleFlow({
   async function completeAssessment() {
     if (completing) return false;
     if (!assessmentAttemptId) {
+      setCompletionStatus("error");
       setCompletionError("This assessment is not ready to complete. Please reload and try again.");
       return false;
     }
     setCompleting(true);
     setCompletionError("");
+    setCompletionStatus("marking");
     const questions = quiz.filter(question => question.type === "shortAnswer").map(question => question.q);
     let token = null;
     try { token = localStorage.getItem(AUTH_TOKEN_KEY); } catch (_) {}
@@ -1176,6 +1179,7 @@ function ModuleFlow({
       setStep(TOTAL_STEPS - 1);
       return true;
     } catch (error) {
+      setCompletionStatus("error");
       setCompletionError(error.message || "Could not complete the assessment.");
       return false;
     } finally {
@@ -1184,20 +1188,25 @@ function ModuleFlow({
   }
   async function next() {
     if (completing) return;
-    if (pendingAnswerSaves.current.length) {
-      const saves = await Promise.all(pendingAnswerSaves.current);
-      pendingAnswerSaves.current = [];
-      const failedSave = saves.find(result => result?.error || !result?.data?.success);
-      if (failedSave) {
-        setCompletionError(failedSave.error?.message || failedSave.data?.error || "Your last answer could not be saved. Please try again.");
-        return;
-      }
-    }
     const ns = Math.min(step + 1, TOTAL_STEPS - 1);
     if (ns === TOTAL_STEPS - 1) {
+      setCompletionError("");
+      setCompletionStatus("saving");
+      if (pendingAnswerSaves.current.length) {
+        const saves = await Promise.all(pendingAnswerSaves.current);
+        pendingAnswerSaves.current = [];
+        const failedSave = saves.find(result => result?.error || !result?.data?.success);
+        if (failedSave) {
+          setCompletionStatus("error");
+          setCompletionError(failedSave.error?.message || failedSave.data?.error || "Your last answer could not be saved. Please try again.");
+          return;
+        }
+      }
+      setCompletionStatus("marking");
       await completeAssessment();
       return;
     }
+    setCompletionStatus("");
     setStep(ns);
   }
   function previous() {
@@ -1308,7 +1317,7 @@ function ModuleFlow({
     className: "screen",
     ref: screenRef,
     style: styles.screen
-  }, step === 0 && /*#__PURE__*/React.createElement(CourseLanding, {
+  }, (inQuiz && (completionStatus || completionError)) && /*#__PURE__*/React.createElement("div", { style: { ...styles.feedbackBox, ...(completionStatus === "error" || completionError ? styles.feedbackBad : styles.feedbackOk), marginBottom: 14 } }, /*#__PURE__*/React.createElement("strong", null, completionStatus === "saving" ? "Saving your answers…" : completionStatus === "marking" ? "Your module is being marked…" : "Module completion needs attention"), /*#__PURE__*/React.createElement("p", { style: styles.feedbackText }, completionStatus === "saving" ? "Please wait while your final response is saved." : completionStatus === "marking" ? "Your written answers are being assessed and your final score is being calculated." : completionError)), step === 0 && /*#__PURE__*/React.createElement(CourseLanding, {
     moduleData: moduleData,
     onStart: next
   }), step >= 1 && step <= lessons.length && /*#__PURE__*/React.createElement(LessonCard, {
@@ -1331,7 +1340,8 @@ function ModuleFlow({
     onSelect: selectAnswer,
     answer: writtenResponses[currentShortIndex],
     onSubmitShortAnswer: submitShortAnswer,
-    onNext: next
+    onNext: next,
+    busy: completing || completionStatus === "saving" || completionStatus === "marking"
   }), isComplete && /*#__PURE__*/React.createElement(Complete, {
     score: score,
     total: autoGradedTotal,
@@ -1578,7 +1588,8 @@ function QuizCard({
   answer,
   onSelect,
   onSubmitShortAnswer,
-  onNext
+  onNext,
+  busy
 }) {
   if (data.type === "shortAnswer") {
     return /*#__PURE__*/React.createElement(ShortAnswerCard, {
@@ -1587,7 +1598,8 @@ function QuizCard({
       count: count,
       answer: answer,
       onSubmit: onSubmitShortAnswer,
-      onNext: onNext
+      onNext: onNext,
+      busy: busy
     });
   }
   const answered = selected !== null;
@@ -1636,7 +1648,8 @@ function ShortAnswerCard({
   count,
   answer,
   onSubmit,
-  onNext
+  onNext,
+  busy
 }) {
   const [draft, setDraft] = React.useState(answer || "");
   const submitted = typeof answer === "string";
@@ -1691,7 +1704,8 @@ function ShortAnswerCard({
     style: styles.feedbackText
   }, "Your written response has been recorded for discussion or review.")), submitted && /*#__PURE__*/React.createElement("button", {
     style: styles.primaryBtn,
-    onClick: onNext
+    onClick: onNext,
+    disabled: busy
   }, index === count - 1 ? "Finish module" : "Next question", " ", /*#__PURE__*/React.createElement(Icon, {
     name: "arrow",
     className: "icon-sm"

@@ -80,7 +80,7 @@ export default async function handler(request) {
     return json(200, result);
   } catch (error) {
     const message = error.message || "manager_marking_failed";
-    const status = message.includes("unauthorized") ? 403 : message.includes("not_configured") ? 503 : 502;
+    const status = message.includes("unauthorized") ? 403 : message.includes("not_configured") || message.includes("supabase_server_credentials_missing") ? 503 : 502;
     return json(status, { error: message });
   }
 }

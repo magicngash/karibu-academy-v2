@@ -8,8 +8,10 @@ Create a Netlify site from the GitHub repository and set these environment varia
 
 - `KARIBU_SUPABASE_URL` — defaults to the deployed project URL when omitted.
 - `KARIBU_SUPABASE_ANON_KEY` — the Supabase publishable/anon key.
+- `SUPABASE_SERVICE_ROLE_KEY` — server-only Supabase service-role key, required by the Netlify assessment functions. Never expose it in browser code or commit it.
+- `DEEPSEEK_API_KEY` — server-only DeepSeek API key, required for AI written-answer marking. Never expose it in browser code or commit it.
 
-Netlify runs `npm run build`, which generates the ignored `runtime-config.js` file. The public anon/publishable key must be present in the Netlify build environment. No Supabase secret or service-role key belongs in this repository.
+Netlify runs `npm run build`, which generates the ignored `runtime-config.js` file. The public anon/publishable key must be present in the Netlify build environment. No Supabase secret or service-role key belongs in this repository. Add the two server-only variables in Netlify Site configuration → Environment variables, then redeploy.
 
 ## Database migrations
 

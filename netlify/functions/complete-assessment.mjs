@@ -81,6 +81,8 @@ export default async function handler(request) {
     });
     return json(result?.success ? 200 : 409, result);
   } catch (error) {
-    return json(502, { error: error.message || "assessment_completion_failed" });
+    const message = error.message || "assessment_completion_failed";
+    const status = message.includes("not_configured") || message.includes("supabase_server_credentials_missing") ? 503 : message.includes("unauthorized") ? 403 : 502;
+    return json(status, { error: message });
   }
 }

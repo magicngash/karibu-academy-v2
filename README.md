@@ -15,9 +15,9 @@ Netlify runs `npm run build`, which generates the ignored `runtime-config.js` fi
 
 ## Database migrations
 
-Run the SQL files in order: `01_schema.sql` through `08_security_and_review_fixes.sql`, then `10_manager_review_fixes.sql`, then `11_disable_manual_trainer_scoring.sql`. Run `04_verification.sql` after the first three migrations, then run the extended checks in `09_security_verification.sql` after all migrations. Always back up the database before applying migrations 05–08.
+Run the SQL files in order: `01_schema.sql` through `08_security_and_review_fixes.sql`, then `10_manager_review_fixes.sql`, then `11_disable_manual_trainer_scoring.sql`, then `12_owner_staff_progress.sql`. Run `04_verification.sql` after the first three migrations, then run the extended checks in `09_security_verification.sql` after all migrations. Always back up the database before applying migrations 05–08.
 
-The security migration adds tenant ownership, server-authoritative progression, sequential module locking, preservation of earned completions, attempt-specific manager review functions, and the `trial` payment status. Migration `10_manager_review_fixes.sql` adds selected-attempt recalculation and manager audit-history access. Migration `11_disable_manual_trainer_scoring.sql` removes the current manager permission to write manual trainer scores; restore that grant only when manual review is intentionally reintroduced. If migration 08 is already installed, run migrations 10 and 11 only; do not rerun 08.
+The security migration adds tenant ownership, server-authoritative progression, sequential module locking, preservation of earned completions, attempt-specific manager review functions, and the `trial` payment status. Migration `10_manager_review_fixes.sql` adds selected-attempt recalculation and manager audit-history access. Migration `11_disable_manual_trainer_scoring.sql` removes the current manager permission to write manual trainer scores; restore that grant only when manual review is intentionally reintroduced. Migration `12_owner_staff_progress.sql` adds read-only owner/trainer access to staff progress and assessment review. If migration 08 is already installed, run migrations 10, 11, and 12 only; do not rerun 08.
 
 Routes:
 

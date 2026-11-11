@@ -311,7 +311,10 @@ function RestaurantRow({
       marginTop: 8,
       display: "inline-block"
     }
-  }, trainingUrl), trainingUrl && /*#__PURE__*/React.createElement("span", {
+  }, trainingUrl), /*#__PURE__*/React.createElement("a", {
+    href: `owner-staff-progress.html?restaurant=${encodeURIComponent(r.id)}`,
+    style: { ...styles.textBtn, color: COLORS.marigoldDeep, textDecoration: "none", marginTop: 8, marginLeft: 10, display: "inline-block" }
+  }, "Staff progress"), trainingUrl && /*#__PURE__*/React.createElement("span", {
     style: {
       display: "inline-flex",
       gap: 8,

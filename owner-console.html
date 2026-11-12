@@ -89,6 +89,16 @@ async function callRpc(name, params) {
     };
   }
 }
+function rpcErrorText(error, data) {
+  const raw = data?.error || error?.message || error?.details || error?.hint || "unknown_error";
+  const known = {
+    unauthorized: "Your owner session has expired. Sign out and sign in again.",
+    pin_must_be_4_digits: "The manager PIN must contain exactly 4 digits.",
+    "42P01": "The owner database migration is missing. Apply migration 08 in Supabase, then try again.",
+    "PGRST202": "The owner_create_restaurant RPC is missing from the deployed Supabase schema. Apply migration 08, then reload the schema cache."
+  };
+  return known[raw] || String(raw);
+}
 const COLORS = {
   espresso: "#2B2420",
   marigold: "#E8A33D",
@@ -647,7 +657,7 @@ function Dashboard({
     });
     setAdding(false);
     if (rpcError || !data?.success) {
-      setError("Couldn't add that restaurant. " + (data?.error === "pin_must_be_4_digits" ? "PIN must be 4 digits." : ""));
+      setError(`Couldn't add that restaurant: ${rpcErrorText(rpcError, data)}`);
       return;
     }
     const staffUrl = await staffAppUrl(newName.trim(), data.restaurant_id);

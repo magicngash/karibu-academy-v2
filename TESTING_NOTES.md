@@ -1,69 +1,113 @@
-# Karibu Academy V2 — Testing Notes
+# Karibu Academy V2 — Partner Testing Instructions
 
-This is the updated restaurant staff-training app. The main changes and features to know before testing are below.
+Please test the app as a small restaurant pilot. The purpose is to check the complete journey from setup to learner results and owner reporting.
 
-## What to test
+## 1. Create a test restaurant
 
-### 1. Staff learner portal
+1. Sign in to the **Owner Console**.
+2. Add a new test restaurant using a name such as **Partner Test Restaurant**.
+3. Open the restaurant’s staff-management area.
+4. Create two staff accounts, for example:
+   - Alana Test
+   - James Test
+5. Record the login details so both accounts can be tested.
 
-- Staff can sign in and resume from their last page instead of restarting the introduction.
-- There are 10 training modules covering guest service, menu knowledge, upselling, service delivery, billing, complaints, communication, emotional intelligence, teamwork, and service standards.
-- Each module contains lessons, examples, a case study, five multiple-choice questions, and five written-answer questions.
-- Staff can complete modules in sequence. Passing a module unlocks the next one.
-- The **Finish module** button saves the answers and shows visible progress while the result is being processed.
-- The final result combines server-graded MCQs with AI-assessed written answers.
-- The learner sees the final percentage, pass/fail result, and written-answer feedback.
-- Failed modules can be retaken. There is currently no hard retake limit.
+## 2. Test the learner journey
 
-### 2. Manager view
+Use one of the new staff accounts first.
 
-Managers can view:
+1. Sign in as the staff member.
+2. Confirm the learner portal opens correctly.
+3. Open **Module 1** and complete the lessons, case study, five MCQs, and five written questions.
+4. Click **Finish module**.
+5. Confirm that the app shows saving/marking progress instead of appearing inactive.
+6. Confirm that the final score, pass/fail result, and written-answer feedback appear.
+7. Continue to **Module 2** if Module 1 is passed.
+8. Complete Module 2 and finish it as well.
+9. Sign out and sign back in to confirm the app resumes at the correct place rather than restarting the introduction.
 
-- Staff completion progress across all 10 modules.
-- Module scores and overall results.
-- Multiple attempts, including retakes.
-- Written answers and AI-generated feedback.
-- Assessment history and audit events.
+Repeat part of the test with the second staff account. It is useful for the two staff members to have different results, such as one passing and one needing a retake, so the reporting can be checked properly.
 
-The current version is read-only for scores. Managers do not manually change marks.
+## 3. Test retakes and results
 
-### 3. Owner console
+If a module is failed, select **Retake exam** and confirm that a new attempt is created. Check that the result includes the MCQ score, AI-assessed written answers, overall percentage, and feedback. There is currently no hard limit on retakes.
 
-The owner console is for the software owner/trainer and includes:
+## 4. Check the manager view
 
-- Restaurant and staff management.
-- Manager access management.
-- Monthly reporting.
-- **Overview** dashboard with total staff, completion rate, attempts, passes, failures, average scores, and pending marking.
-- Module-by-module performance and MCQ question analysis.
-- Needs-attention items and recent activity.
-- **Staff progress** drill-down for individual staff, modules, attempts, written answers, and feedback.
+Open the manager view for the test restaurant and confirm that it shows:
 
-The overview supports **All time**, **Last 30 days**, and **This month** filters.
+- Both staff members
+- Progress for Modules 1 and 2
+- Module completion status
+- Scores and pass/fail results
+- Written answers and AI feedback
+- Separate attempts if a retake was completed
 
-### 4. Reports and exports
+The current version is read-only for scores; managers do not manually change marks.
+
+## 5. Check the owner overview
+
+Return to the Owner Console and open **Overview** for the test restaurant. Confirm that it shows staff-wide totals for:
+
+- Staff and staff who have started
+- Modules completed
+- Completion percentage
+- Attempts, passes, failures, and awaiting marking
+- Average score and average MCQ score
+- Module-by-module performance
+- MCQ question performance
+- Recent activity and needs-attention items
+
+Try the **All time**, **Last 30 days**, and **This month** filters.
+
+Also open **Staff progress** and confirm that individual attempts, written answers, scores, feedback, and audit history can be reviewed.
+
+## 6. Test reports and provide feedback
 
 From the owner Overview page:
 
-- **Download CSV** exports summary metrics, module performance, and MCQ question results.
-- **Print / save PDF** opens a formatted report in the browser print dialog. Choose **Save as PDF**.
+1. Click **Download CSV** and confirm the file opens with summary, module, and MCQ data.
+2. Click **Print / save PDF** and choose **Save as PDF** in the browser print dialog.
+3. Confirm that the report contains the main metrics and module results.
 
-## Suggested test journey
+Please send feedback covering:
 
-1. Create or use a staff account such as Alana.
-2. Sign in and confirm the learner resumes correctly after signing out and back in.
-3. Complete one module, including all MCQs and written answers.
-4. Click **Finish module** and confirm that saving/marking progress is visible.
-5. Confirm that the final score and AI written-answer feedback appear.
-6. Try a failed module again using **Retake exam**.
-7. Confirm the next module unlocks after passing.
-8. Sign in to the manager view and confirm the attempt, score, answers, and feedback are visible.
-9. Open the owner console, select **Overview**, and test the filters and exports.
-10. Open **Staff progress** and confirm the same attempts and results can be investigated in detail.
+- Anything that was confusing.
+- Any button that appeared not to respond.
+- Whether scores and AI feedback appeared correctly.
+- Whether the module progression felt logical.
+- Whether the owner overview numbers matched the learner activity.
+- Any spelling, content, design, or mobile-display issues.
+- Any feature that would be important for real restaurant use.
 
-## Important testing notes
+## 7. Full feature checklist
 
-- AI marking requires the deployed DeepSeek API key and server credentials to be configured in Netlify.
-- Database migrations must be applied, including the latest owner overview migration.
-- A completed score may take a short time while written answers are being assessed.
-- If a result does not appear, check the visible completion message and the browser console/network response.
+Please also check each of these areas before finishing the test:
+
+| Area | Confirm that it works |
+|---|---|
+| Owner login | The owner can sign in and return to the owner console. |
+| Restaurant setup | A restaurant can be added, viewed, edited, and removed only when intended. |
+| Staff setup | Two staff members can be created and assigned to the correct restaurant. |
+| Manager setup | A manager can be created and given the restaurant’s manager login details. |
+| Staff login | Both staff accounts can sign in and see the correct learner portal. |
+| Resume | Signing out and back in returns a learner to the appropriate page or module. |
+| Course content | Lessons, examples, case studies, takeaways, and navigation display correctly. |
+| Assessment | MCQs and written questions can be answered and saved. |
+| Completion | **Finish module** shows progress, completes processing, and displays a result or a useful error. |
+| AI marking | Written answers receive a score and feedback, and the final score is calculated. |
+| Progression | Passing a module unlocks the next module. |
+| Retakes | A failed module can be retaken and the new attempt is recorded separately. |
+| Manager review | Progress, attempts, scores, written answers, feedback, and audit history are visible. |
+| Owner overview | Summary metrics, completion, pass/fail results, module performance, MCQ analysis, recent activity, and attention items are visible. |
+| Filters | All time, last 30 days, and this month produce sensible overview results. |
+| Staff progress | Individual staff and module drill-down works. |
+| CSV report | The exported file opens and contains summary, module, and MCQ fields. |
+| PDF report | Print/save PDF produces a readable report with the selected dashboard data. |
+| Mobile layout | The main learner, manager, and owner screens remain usable on a phone. |
+
+The sample only needs to complete two modules, but the partner should open and inspect the available owner, manager, learner, reporting, and export features so that the whole product is covered.
+
+## Important notes
+
+AI marking requires the deployed AI API key and server credentials to be active. Final results may take a short time while written answers are being assessed. If anything fails, please record the staff account, restaurant, module, action taken, approximate time, and any visible error message or browser-console error.

@@ -2,15 +2,19 @@
 
 Please test the app as a small restaurant pilot. The purpose is to check the complete journey from setup to learner results and owner reporting.
 
-## 1. Create a test restaurant
+## 1. Create a test restaurant and manager account
 
-1. Sign in to the **Owner Console**.
-2. Add a new test restaurant using a name such as **Partner Test Restaurant**.
-3. Open the restaurant’s staff-management area.
-4. Create two staff accounts, for example:
+1. Open the Owner Console here: **[https://karibu-academyv2.netlify.app/console](https://karibu-academyv2.netlify.app/console)**.
+2. Create an owner account or sign in if an owner account already exists.
+3. Add a new test restaurant using a name such as **Partner Test Restaurant**.
+4. When the restaurant is created, the console will provide a restaurant link and manager login details.
+5. Open the generated restaurant link and sign in as the manager. The manager account is the account used to manage staff for that restaurant.
+6. From the manager view, create two staff accounts, for example:
    - Alana Test
    - James Test
-5. Record the login details so both accounts can be tested.
+7. Record the staff login details so both accounts can be tested.
+
+The setup sequence is therefore: **Owner Console → create restaurant → open the generated restaurant link → manager login → create staff accounts → test the learner portal.**
 
 ## 2. Test the learner journey
 

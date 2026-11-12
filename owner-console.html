@@ -314,7 +314,10 @@ function RestaurantRow({
   }, trainingUrl), /*#__PURE__*/React.createElement("a", {
     href: `owner-staff-progress.html?restaurant=${encodeURIComponent(r.id)}`,
     style: { ...styles.textBtn, color: COLORS.marigoldDeep, textDecoration: "none", marginTop: 8, marginLeft: 10, display: "inline-block" }
-  }, "Staff progress"), trainingUrl && /*#__PURE__*/React.createElement("span", {
+  }, "Staff progress"), /*#__PURE__*/React.createElement("a", {
+    href: `owner-overview.html?restaurant=${encodeURIComponent(r.id)}`,
+    style: { ...styles.textBtn, color: COLORS.avocado, textDecoration: "none", marginTop: 8, marginLeft: 10, display: "inline-block" }
+  }, "Overview"), trainingUrl && /*#__PURE__*/React.createElement("span", {
     style: {
       display: "inline-flex",
       gap: 8,

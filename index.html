@@ -78,6 +78,21 @@ async function callRpc(name, params) {
 // MODULE CONTENT DATA
 // Each entry in MODULE_DATA is everything ModuleFlow needs to render a
 // full module: landing copy, lessons, a case study (or takeaways), and quiz.
+function assessmentErrorMessage(code) {
+  const messages = {
+    unauthorized: "Your session has expired. Sign out, sign back in, and try again.",
+    invalid_answer: "That response could not be saved. Check it and try again.",
+    incomplete_assessment: "Some answers have not reached the server yet. Re-save any written responses, then finish the module again.",
+    incomplete_written_answers: "One or more written responses are missing. Go back and save each response before finishing.",
+    deepseek_not_configured: "Written-answer scoring is temporarily unavailable. Your saved answers are safe; please try again later.",
+    marking_request_failed: "The scoring service could not score your written answers. Your saved answers are safe; press Finish Module to retry.",
+    invalid_marking_response: "The scoring service returned an unreadable result. Your saved answers are safe; press Finish Module to retry.",
+    invalid_marking_result: "The scoring service returned an invalid score. Your saved answers are safe; press Finish Module to retry.",
+    assessment_completion_failed: "The assessment could not be finalized. Your saved answers are safe; please try Finish Module again."
+  };
+  return messages[code] || (code && !/^[a-z0-9_]+$/.test(code) ? code : "Something went wrong while completing the assessment. Please try again.");
+}
+
 // =====================================================================
 const LEGACY_MODULE_DATA = {
   1: {
@@ -1097,6 +1112,7 @@ function ModuleFlow({
   const [completionError, setCompletionError] = React.useState("");
   const [completionStatus, setCompletionStatus] = React.useState("");
   const [completing, setCompleting] = React.useState(false);
+  const completionStarted = React.useRef(false);
   const pendingAnswerSaves = React.useRef([]);
   const writtenKey = resumeKey ? resumeKey.replace("karibu-training:", "karibu-written:") : null;
   const [writtenResponses, setWrittenResponses] = React.useState(() => {
@@ -1106,6 +1122,8 @@ function ModuleFlow({
       return [];
     }
   });
+  const [writtenSaveStatus, setWrittenSaveStatus] = React.useState("");
+  const [writtenSaveError, setWrittenSaveError] = React.useState("");
   const screenRef = React.useRef(null);
   const {
     lessons,
@@ -1145,7 +1163,7 @@ function ModuleFlow({
     callRpc("start_assessment_attempt", { p_staff_id: session.staffId, p_module_id: moduleId }).then(({ data, error }) => {
       if (!active) return;
       if (error || !data?.success) {
-        setCompletionError(error?.message || data?.error || "Could not start the assessment attempt.");
+        setCompletionError(assessmentErrorMessage(error?.message || data?.error || "Could not start the assessment attempt."));
         return;
       }
       setAssessmentAttemptId(data.attempt_id);
@@ -1180,16 +1198,17 @@ function ModuleFlow({
       return true;
     } catch (error) {
       setCompletionStatus("error");
-      setCompletionError(error.message || "Could not complete the assessment.");
+      setCompletionError(assessmentErrorMessage(error.message || "assessment_completion_failed"));
       return false;
     } finally {
       setCompleting(false);
     }
   }
   async function next() {
-    if (completing) return;
+    if (completing || completionStarted.current) return;
     const ns = Math.min(step + 1, TOTAL_STEPS - 1);
     if (ns === TOTAL_STEPS - 1) {
+      completionStarted.current = true;
       setCompletionError("");
       setCompletionStatus("saving");
       if (pendingAnswerSaves.current.length) {
@@ -1198,18 +1217,21 @@ function ModuleFlow({
         const failedSave = saves.find(result => result?.error || !result?.data?.success);
         if (failedSave) {
           setCompletionStatus("error");
-          setCompletionError(failedSave.error?.message || failedSave.data?.error || "Your last answer could not be saved. Please try again.");
+          setCompletionError(assessmentErrorMessage(failedSave.error?.message || failedSave.data?.error || "Your last answer could not be saved. Please try again."));
+          completionStarted.current = false;
           return;
         }
       }
       setCompletionStatus("marking");
-      await completeAssessment();
+      const success = await completeAssessment();
+      if (!success) completionStarted.current = false;
       return;
     }
     setCompletionStatus("");
     setStep(ns);
   }
   function previous() {
+    if (completionStarted.current || completing) return;
     setStep(s => Math.max(0, s - 1));
   }
   function selectAnswer(optIdx) {
@@ -1242,47 +1264,56 @@ function ModuleFlow({
     setAnswers([]);
     setSelectedOptions([]);
     setWrittenResponses([]);
+    setWrittenSaveStatus("");
+    setWrittenSaveError("");
     setAssessmentResult(null);
     setCompletionError("");
     setAssessmentAttemptId(null);
+    completionStarted.current = false;
     if (resumeKey) localStorage.removeItem(resumeKey);
     if (writtenKey) localStorage.removeItem(writtenKey);
   }
-  function submitShortAnswer(response) {
+  async function submitShortAnswer(response) {
     const shortIndex = quiz.slice(0, quizIndex + 1).filter(question => question.type === "shortAnswer").length - 1;
-    const moduleId = Number(resumeKey?.split(":").pop());
+    if (!session?.staffId || !assessmentAttemptId) {
+      setWrittenSaveStatus("error");
+      setWrittenSaveError("Your assessment session is still starting, so this response has not been saved. Keep this answer and try Save response again in a moment.");
+      return false;
+    }
+    setWrittenSaveStatus("saving");
+    setWrittenSaveError("");
+    const result = await callRpc("save_assessment_written_answer", {
+      p_attempt_id: assessmentAttemptId,
+      p_question_index: shortIndex,
+      p_answer: response
+    });
+    if (result.error || !result.data?.success) {
+      setWrittenSaveStatus("error");
+      setWrittenSaveError(assessmentErrorMessage(result.error?.message || result.data?.error || "written_answer_save_failed"));
+      return false;
+    }
     const nextWrittenResponses = [...writtenResponses];
     nextWrittenResponses[shortIndex] = response;
     setWrittenResponses(nextWrittenResponses);
     if (writtenKey) {
-      localStorage.setItem(writtenKey, JSON.stringify({
-        responses: nextWrittenResponses,
-        updatedAt: Date.now()
-      }));
+      try { localStorage.setItem(writtenKey, JSON.stringify({ responses: nextWrittenResponses, updatedAt: Date.now() })); } catch (_) {}
     }
-    if (session?.staffId && Number.isInteger(moduleId) && assessmentAttemptId) {
-      pendingAnswerSaves.current.push(callRpc("save_assessment_written_answer", {
-        p_attempt_id: assessmentAttemptId,
-        p_question_index: shortIndex,
-        p_answer: response
-      }));
-    } else if (session?.staffId && Number.isInteger(moduleId)) {
-      callRpc("save_written_answer", {
-        p_staff_id: session.staffId,
-        p_module_id: moduleId,
-        p_question_index: shortIndex,
-        p_answer: response
-      }).then(result => {
-        if (result.error || !result.data?.success) console.warn("Written answer was saved locally but not to Supabase.", result.error || result.data);
-      });
-    }
+    setWrittenSaveStatus("saved");
+    setCompletionError("");
     setAnswers(a => {
       const copy = [...a];
       copy[quizIndex] = response;
       return copy;
     });
+    return true;
   }
   const currentShortIndex = inQuiz && quiz[quizIndex]?.type === "shortAnswer" ? quiz.slice(0, quizIndex + 1).filter(question => question.type === "shortAnswer").length - 1 : -1;
+  React.useEffect(() => {
+    if (currentShortIndex >= 0) {
+      setWrittenSaveStatus("");
+      setWrittenSaveError("");
+    }
+  }, [quizIndex]);
   return /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
     style: styles.topBar
   }, /*#__PURE__*/React.createElement("button", {
@@ -1317,7 +1348,7 @@ function ModuleFlow({
     className: "screen",
     ref: screenRef,
     style: styles.screen
-  }, (inQuiz && (completionStatus || completionError)) && /*#__PURE__*/React.createElement("div", { style: { ...styles.feedbackBox, ...(completionStatus === "error" || completionError ? styles.feedbackBad : styles.feedbackOk), marginBottom: 14 } }, /*#__PURE__*/React.createElement("strong", null, completionStatus === "saving" ? "Saving your answers…" : completionStatus === "marking" ? "Your module is being marked…" : "Module completion needs attention"), /*#__PURE__*/React.createElement("p", { style: styles.feedbackText }, completionStatus === "saving" ? "Please wait while your final response is saved." : completionStatus === "marking" ? "Your written answers are being assessed and your final score is being calculated." : completionError)), step === 0 && /*#__PURE__*/React.createElement(CourseLanding, {
+  }, (inQuiz && (completionStatus || completionError)) && /*#__PURE__*/React.createElement("div", { role: completionStatus === "error" || completionError ? "alert" : "status", "aria-live": completionStatus === "error" || completionError ? "assertive" : "polite", "aria-atomic": "true", style: { ...styles.feedbackBox, ...(completionStatus === "error" || completionError ? styles.feedbackBad : styles.feedbackOk), marginBottom: 14, padding: "18px 20px", borderWidth: 2, boxShadow: "0 4px 14px rgba(49, 40, 31, 0.10)" } }, /*#__PURE__*/React.createElement("strong", { style: { ...styles.feedbackHeading, fontSize: "1rem" } }, completionStatus === "saving" ? "Saving your answers…" : completionStatus === "marking" ? "Your module is being completed…" : "Module completion needs attention"), /*#__PURE__*/React.createElement("p", { style: { ...styles.feedbackText, marginTop: 8 } }, completionStatus === "saving" ? "Please wait. We’re saving your answers before sending them for scoring. Keep this page open and don’t tap Complete Module again." : completionStatus === "marking" ? "Your answers are being scored and your module progress is being updated. This may take a little while. Please wait and don’t tap Complete Module again." : completionError)), step === 0 && /*#__PURE__*/React.createElement(CourseLanding, {
     moduleData: moduleData,
     onStart: next
   }), step >= 1 && step <= lessons.length && /*#__PURE__*/React.createElement(LessonCard, {
@@ -1340,6 +1371,9 @@ function ModuleFlow({
     onSelect: selectAnswer,
     answer: writtenResponses[currentShortIndex],
     onSubmitShortAnswer: submitShortAnswer,
+    writtenSaveStatus: writtenSaveStatus,
+    writtenSaveError: writtenSaveError,
+    finishing: completionStatus === "saving" || completionStatus === "marking" || completing,
     onNext: next,
     busy: completing || completionStatus === "saving" || completionStatus === "marking"
   }), isComplete && /*#__PURE__*/React.createElement(Complete, {
@@ -1588,6 +1622,9 @@ function QuizCard({
   answer,
   onSelect,
   onSubmitShortAnswer,
+  writtenSaveStatus,
+  writtenSaveError,
+  finishing,
   onNext,
   busy
 }) {
@@ -1598,6 +1635,9 @@ function QuizCard({
       count: count,
       answer: answer,
       onSubmit: onSubmitShortAnswer,
+      saveStatus: writtenSaveStatus,
+      saveError: writtenSaveError,
+      finishing: finishing,
       onNext: onNext,
       busy: busy
     });
@@ -1636,8 +1676,10 @@ function QuizCard({
     style: styles.feedbackText
   }, "Your final score is calculated securely when you complete the module.")), answered && /*#__PURE__*/React.createElement("button", {
     style: styles.primaryBtn,
-    onClick: onNext
-  }, index === count - 1 ? "Finish module" : "Next question", " ", /*#__PURE__*/React.createElement(Icon, {
+    onClick: onNext,
+    disabled: busy,
+    "aria-busy": busy
+  }, index === count - 1 && busy ? "Processing…" : index === count - 1 ? "Complete Module" : "Next question", " ", !busy && /*#__PURE__*/React.createElement(Icon, {
     name: "arrow",
     className: "icon-sm"
   })));
@@ -1648,11 +1690,16 @@ function ShortAnswerCard({
   count,
   answer,
   onSubmit,
+  saveStatus,
+  saveError,
+  finishing,
   onNext,
   busy
 }) {
   const [draft, setDraft] = React.useState(answer || "");
-  const submitted = typeof answer === "string";
+  const submitted = saveStatus === "saved" && typeof answer === "string";
+  const saving = saveStatus === "saving";
+  const needsServerSave = typeof answer === "string" && !submitted && !saving;
   React.useEffect(() => {
     setDraft(answer || "");
   }, [answer, data.q]);
@@ -1683,14 +1730,20 @@ function ShortAnswerCard({
     placeholder: "Type your answer here...",
     "aria-label": "Short answer",
     style: styles.shortAnswerInput
-  }), !submitted && /*#__PURE__*/React.createElement("button", {
+  }), needsServerSave && /*#__PURE__*/React.createElement("p", {
+    role: "status",
+    style: styles.shortAnswerHint
+  }, "This response is saved on this device but has not been confirmed in the server yet. Press Save response before continuing."), saveError && /*#__PURE__*/React.createElement("div", {
+    role: "alert",
+    style: { ...styles.feedbackBox, ...styles.feedbackBad }
+  }, saveError), !submitted && /*#__PURE__*/React.createElement("button", {
     style: {
       ...styles.primaryBtn,
-      opacity: draft.trim() ? 1 : 0.55
+      opacity: draft.trim() && !saving ? 1 : 0.55
     },
     onClick: submit,
-    disabled: !draft.trim()
-  }, "Save response ", /*#__PURE__*/React.createElement(Icon, {
+    disabled: !draft.trim() || saving
+  }, saving ? "Saving response…" : saveError ? "Retry save" : "Save response", " ", !saving && /*#__PURE__*/React.createElement(Icon, {
     name: "arrow",
     className: "icon-sm"
   })), submitted && /*#__PURE__*/React.createElement("div", {
@@ -1705,8 +1758,9 @@ function ShortAnswerCard({
   }, "Your written response has been recorded for discussion or review.")), submitted && /*#__PURE__*/React.createElement("button", {
     style: styles.primaryBtn,
     onClick: onNext,
-    disabled: busy
-  }, index === count - 1 ? "Finish module" : "Next question", " ", /*#__PURE__*/React.createElement(Icon, {
+    disabled: busy,
+    "aria-busy": busy
+  }, index === count - 1 && finishing ? "Processing…" : index === count - 1 ? "Complete Module" : "Next question", " ", !finishing && /*#__PURE__*/React.createElement(Icon, {
     name: "arrow",
     className: "icon-sm"
   })));

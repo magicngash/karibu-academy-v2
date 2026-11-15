@@ -1,5 +1,6 @@
 import { readFile } from "node:fs/promises";
 import { spawn } from "node:child_process";
+import completeAssessment from "./netlify/functions/complete-assessment.mjs";
 
 const read = (file) => readFile(file, "utf8");
 const assert = (condition, message) => {
@@ -8,6 +9,8 @@ const assert = (condition, message) => {
 
 const index = await read("index.html");
 const endpoint = await read("netlify/functions/mark-written-answer.mjs");
+const completionEndpoint = await read("netlify/functions/complete-assessment.mjs");
+const markingMigration = await read("15_assessment_marking_progress.sql");
 const migration = await read("08_security_and_review_fixes.sql");
 const verification = await read("09_security_verification.sql");
 const pkg = JSON.parse(await read("package.json"));
@@ -20,8 +23,14 @@ assert(index.includes('callRpc("save_assessment_written_answer"'), "written answ
 assert(index.includes('role: "alert"') && index.includes("Retry save"), "written-answer save failures are not visible and retryable");
 assert(index.includes("not been confirmed in the server yet"), "locally cached answers may be mistaken for server-persisted answers");
 assert(index.includes("marking_request_failed") && index.includes("incomplete_assessment"), "AI-marking and incomplete-assessment errors are not mapped for learners");
-assert(index.includes("don’t tap Complete Module again") && index.includes('"aria-live"'), "module completion does not announce a clear wait message accessibly");
+assert(index.includes("don’t click Complete Module again") && index.includes('"aria-live"'), "module completion does not announce a clear wait message accessibly");
 assert(index.includes('"Processing…"') && index.includes("completionStarted.current"), "module completion does not prevent repeat taps or show processing feedback");
+assert(index.includes("Scoring written answers:") && index.includes("of ${total}"), "learner status does not show persisted written-answer scoring progress as text");
+assert(index.includes('callRpc("get_assessment_attempt_for_staff"') && index.includes("waitForAssessmentResult"), "completion state cannot be checked or recovered from saved server status");
+assert(completionEndpoint.includes('begin_assessment_marking') && completionEndpoint.includes('save_assessment_marking_score'), "completion endpoint does not start durable marking or save each score");
+assert(completionEndpoint.includes('finalize_assessment_marking') && completionEndpoint.includes('pause_assessment_marking'), "completion endpoint does not finalize or safely pause resumable marking");
+assert(markingMigration.includes("marking_lease_expires_at") && markingMigration.includes("marking_last_error"), "assessment marking migration lacks a recovery lease or saved error state");
+assert(markingMigration.includes("grant execute on function public.begin_assessment_marking") && markingMigration.includes("to service_role"), "marking control RPCs are not restricted to the server role");
 assert(endpoint.includes('missing_authentication'), "AI endpoint does not require authentication");
 assert(endpoint.includes('manager_assessment_answer_context'), "AI endpoint does not use attempt-specific context");
 assert(endpoint.includes('save_attempt_ai_mark'), "AI endpoint does not persist attempt-specific marks");
@@ -32,6 +41,96 @@ assert(migration.includes("review_assessment_written_answer"), "attempt trainer 
 assert(verification.includes("assessment_mcq_keys"), "extended verification missing answer-key checks");
 assert(pkg.scripts?.test === "node test.mjs", "test script is not registered");
 
+const savedScores = new Array(5).fill(null);
+let aiCalls = 0;
+let scoreSaves = 0;
+let pauseCalls = 0;
+let finalizeCalls = 0;
+let failOnAiCall = null;
+let requestNumber = 0;
+const originalFetch = globalThis.fetch;
+const originalEnv = Object.fromEntries(["KARIBU_SUPABASE_URL", "SUPABASE_URL", "SUPABASE_SERVICE_ROLE_KEY", "DEEPSEEK_API_KEY"].map(key => [key, process.env[key]]));
+process.env.KARIBU_SUPABASE_URL = "https://supabase.invalid";
+process.env.SUPABASE_SERVICE_ROLE_KEY = "test-service-key";
+process.env.DEEPSEEK_API_KEY = "test-ai-key";
+globalThis.fetch = async (url, options = {}) => {
+  if (String(url).includes("api.deepseek.com")) {
+    aiCalls += 1;
+    if (aiCalls === failOnAiCall) return new Response(JSON.stringify({ error: "temporary" }), { status: 503 });
+    return new Response(JSON.stringify({ choices: [{ message: { content: JSON.stringify({ score: 2, feedback: "Good response." }) } }] }), { status: 200 });
+  }
+  const name = new URL(String(url)).pathname.split("/").pop();
+  const body = JSON.parse(options.body || "{}");
+  if (name === "begin_assessment_marking") {
+    requestNumber += 1;
+    return new Response(JSON.stringify({
+      success: true,
+      module_id: 1,
+      lease_token: `lease-${requestNumber}`,
+      written_answers: savedScores.map((saved, question_index) => ({
+        attempt_id: "attempt-test",
+        question_index,
+        answer: `Learner answer ${question_index + 1}`,
+        ai_score: saved?.score ?? null,
+        ai_feedback: saved?.feedback ?? null
+      }))
+    }), { status: 200 });
+  }
+  if (name === "renew_assessment_marking_lease") return new Response(JSON.stringify({ success: true }), { status: 200 });
+  if (name === "save_assessment_marking_score") {
+    savedScores[body.p_question_index] = { score: body.p_ai_score, feedback: body.p_ai_feedback };
+    scoreSaves += 1;
+    return new Response(JSON.stringify({ success: true, score: body.p_ai_score, feedback: body.p_ai_feedback }), { status: 200 });
+  }
+  if (name === "pause_assessment_marking") {
+    pauseCalls += 1;
+    return new Response(JSON.stringify({ success: true }), { status: 200 });
+  }
+  if (name === "finalize_assessment_marking") {
+    finalizeCalls += 1;
+    const complete = savedScores.every(Boolean);
+    return new Response(JSON.stringify(complete
+      ? { success: true, status: "passed", attempt_id: "attempt-test", mcq_score: 5, mcq_total: 5, written_score: 10, written_total: 10, overall_percent: 100, passed: true }
+      : { success: false, error: "incomplete_assessment" }), { status: 200 });
+  }
+  throw new Error(`Unexpected mock RPC ${name}`);
+};
+
+async function callCompletion() {
+  return completeAssessment(new Request("https://karibu.invalid/.netlify/functions/complete-assessment", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Authorization: "Bearer staff-session-token" },
+    body: JSON.stringify({ attempt_id: "attempt-test", questions: ["Q1", "Q2", "Q3", "Q4", "Q5"] })
+  }));
+}
+
+try {
+  let response = await callCompletion();
+  assert(response.status === 200 && (await response.json()).passed === true, "successful scoring did not finalize the attempt");
+  assert(scoreSaves === 5 && finalizeCalls === 1, "successful scoring did not persist all five answers before finalization");
+
+  savedScores.fill(null);
+  aiCalls = 0;
+  scoreSaves = 0;
+  pauseCalls = 0;
+  finalizeCalls = 0;
+  failOnAiCall = 3;
+  response = await callCompletion();
+  assert(response.status === 502 && scoreSaves === 2 && pauseCalls === 1, "a failed scoring request did not preserve prior scores and release its lease");
+
+  failOnAiCall = null;
+  const callsBeforeRetry = aiCalls;
+  response = await callCompletion();
+  assert(response.status === 200 && (await response.json()).passed === true, "resumed scoring did not complete the attempt");
+  assert(aiCalls - callsBeforeRetry === 3 && scoreSaves === 5 && finalizeCalls === 1, "retry rescored saved answers instead of only scoring the remaining responses");
+} finally {
+  globalThis.fetch = originalFetch;
+  for (const [key, value] of Object.entries(originalEnv)) {
+    if (value === undefined) delete process.env[key];
+    else process.env[key] = value;
+  }
+}
+
 for (const file of ["build.mjs", "netlify/functions/mark-written-answer.mjs", "netlify/functions/complete-assessment.mjs"]) {
   await new Promise((resolve, reject) => {
     const child = spawn(process.execPath, ["--check", file], { stdio: "inherit" });
@@ -39,4 +138,4 @@ for (const file of ["build.mjs", "netlify/functions/mark-written-answer.mjs", "n
     child.on("exit", (code) => code === 0 ? resolve() : reject(new Error(`${file} syntax check failed`)));
   });
 }
-console.log("Static security checks passed.");
+console.log("Assessment flow regression checks passed.");

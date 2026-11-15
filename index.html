@@ -85,9 +85,11 @@ function assessmentErrorMessage(code) {
     incomplete_assessment: "Some answers have not reached the server yet. Re-save any written responses, then finish the module again.",
     incomplete_written_answers: "One or more written responses are missing. Go back and save each response before finishing.",
     deepseek_not_configured: "Written-answer scoring is temporarily unavailable. Your saved answers are safe; please try again later.",
-    marking_request_failed: "The scoring service could not score your written answers. Your saved answers are safe; press Finish Module to retry.",
-    invalid_marking_response: "The scoring service returned an unreadable result. Your saved answers are safe; press Finish Module to retry.",
-    invalid_marking_result: "The scoring service returned an invalid score. Your saved answers are safe; press Finish Module to retry.",
+    marking_request_failed: "The scoring service could not score one response. Your answers and any saved scores are safe; press Complete Module to continue.",
+    invalid_marking_response: "The scoring service returned an unreadable result. Your answers and any saved scores are safe; press Complete Module to continue.",
+    invalid_marking_result: "The scoring service returned an invalid score. Your saved answers are safe; press Complete Module to continue.",
+    marking_request_timeout: "Scoring took too long to respond. Your answers and any scores already saved are safe; press Complete Module to continue.",
+    marking_lease_lost: "The scoring session stopped before completion. Your answers and saved scores are safe; press Complete Module to continue.",
     assessment_completion_failed: "The assessment could not be finalized. Your saved answers are safe; please try Finish Module again."
   };
   return messages[code] || (code && !/^[a-z0-9_]+$/.test(code) ? code : "Something went wrong while completing the assessment. Please try again.");
@@ -1085,6 +1087,34 @@ function Icon({
 // =====================================================================
 // SHARED STEP HELPERS FOR MODULE 1
 // =====================================================================
+function CompletionStatusBanner({ status, error, progress }) {
+  if (!status && !error) return null;
+  const isError = status === "error" || Boolean(error);
+  const scored = progress?.scored || 0;
+  const total = progress?.total || 5;
+  const heading = status === "checking" ? "Checking your saved assessment…"
+    : status === "saving" ? "Saving your answers…"
+    : status === "marking" ? `Scoring written answers: ${scored} of ${total}`
+    : status === "paused" ? "Scoring paused"
+    : "Module completion needs attention";
+  const message = status === "checking"
+    ? "We’re checking whether scoring is already underway or your result is ready. You do not need to sign out or re-enter answers."
+    : status === "saving"
+      ? "Please wait while we confirm your saved answers. Keep this page open and don’t click Complete Module again."
+    : status === "marking"
+      ? `Your answers are saved. We’re scoring the written responses (${scored} of ${total} scored). Keep this page open; you do not need to sign out.`
+      : status === "paused"
+        ? "Your answers and any scores already saved are safe. Press Complete Module to continue scoring; you do not need to re-enter your answers."
+        : (error || "Something went wrong while completing the module.");
+  return React.createElement("div", {
+    role: isError ? "alert" : "status",
+    "aria-live": isError ? "assertive" : "polite",
+    "aria-atomic": "true",
+    style: { ...styles.feedbackBox, ...(isError ? styles.feedbackBad : styles.feedbackOk), marginBottom: 14, padding: "18px 20px", borderWidth: 2, boxShadow: "0 4px 14px rgba(49, 40, 31, 0.10)" }
+  }, React.createElement("strong", { style: { ...styles.feedbackHeading, fontSize: "1rem" } }, heading),
+  React.createElement("p", { style: { ...styles.feedbackText, marginTop: 8 } }, message),
+  status === "paused" && error ? React.createElement("p", { style: { ...styles.feedbackText, marginTop: 6 } }, error) : null);
+}
 function ModuleFlow({
   moduleData,
   session,
@@ -1110,9 +1140,13 @@ function ModuleFlow({
   const [assessmentAttemptId, setAssessmentAttemptId] = React.useState(() => savedProgress?.assessmentAttemptId || null);
   const [assessmentResult, setAssessmentResult] = React.useState(null);
   const [completionError, setCompletionError] = React.useState("");
-  const [completionStatus, setCompletionStatus] = React.useState("");
+  const [completionStatus, setCompletionStatus] = React.useState(() => savedProgress?.assessmentAttemptId ? "checking" : "");
+  const [markingProgress, setMarkingProgress] = React.useState({ scored: 0, total: 5, leaseExpiresAt: null });
+  const [serverAttemptStatus, setServerAttemptStatus] = React.useState("");
   const [completing, setCompleting] = React.useState(false);
   const completionStarted = React.useRef(false);
+  const statusPollInFlight = React.useRef(false);
+  const finalResultHandled = React.useRef(false);
   const pendingAnswerSaves = React.useRef([]);
   const writtenKey = resumeKey ? resumeKey.replace("karibu-training:", "karibu-written:") : null;
   const [writtenResponses, setWrittenResponses] = React.useState(() => {
@@ -1170,6 +1204,100 @@ function ModuleFlow({
     });
     return () => { active = false; };
   }, [session?.staffId, resumeKey, assessmentAttemptId]);
+  function handleFinalizedAssessment(result) {
+    if (!result || !(result.status === "passed" || result.status === "failed" || result.status === "revoked")) return false;
+    if (finalResultHandled.current) return true;
+    finalResultHandled.current = true;
+    setAssessmentResult(result);
+    setCompletionError("");
+    setCompletionStatus("");
+    setServerAttemptStatus(result.status);
+    completionStarted.current = true;
+    if (resumeKey) {
+      try { localStorage.removeItem(resumeKey); } catch (_) {}
+    }
+    onFinish(result.mcq_score, result.mcq_total, result.passed === true, result);
+    setStep(TOTAL_STEPS - 1);
+    return true;
+  }
+
+  async function refreshAttemptStatus() {
+    if (!assessmentAttemptId || statusPollInFlight.current) return null;
+    statusPollInFlight.current = true;
+    try {
+      const { data, error } = await callRpc("get_assessment_attempt_for_staff", { p_attempt_id: assessmentAttemptId });
+      if (error || !data?.success || !data?.attempt) return null;
+      const attempt = data.attempt;
+      const written = Array.isArray(data.written_answers) ? data.written_answers : [];
+      const scored = written.filter(item => Number.isInteger(item.ai_score) && typeof item.ai_feedback === "string").length;
+      setMarkingProgress({ scored, total: 5, leaseExpiresAt: attempt.marking_lease_expires_at || null });
+      setServerAttemptStatus(attempt.status || "");
+
+      if (["passed", "failed", "revoked"].includes(attempt.status)) {
+        const result = {
+          success: true,
+          status: attempt.status,
+          attempt_id: attempt.id,
+          mcq_score: attempt.mcq_score,
+          mcq_total: attempt.mcq_total,
+          written_score: attempt.written_score,
+          written_total: attempt.written_total,
+          overall_percent: attempt.overall_percent,
+          passed: attempt.passed
+        };
+        handleFinalizedAssessment(result);
+        return { finalized: true, attempt, result };
+      }
+
+      if (attempt.status === "marking") {
+        const leaseExpiry = Date.parse(attempt.marking_lease_expires_at || "");
+        if (Number.isFinite(leaseExpiry) && leaseExpiry <= Date.now()) {
+          setCompletionStatus("paused");
+          setCompletionError(assessmentErrorMessage("marking_lease_lost"));
+          return { paused: true, attempt, scored };
+        }
+        setCompletionStatus("marking");
+        setCompletionError("");
+      } else if (attempt.status === "in_progress" && attempt.marking_last_error) {
+        setCompletionStatus("paused");
+        setCompletionError(assessmentErrorMessage(attempt.marking_last_error));
+        return { paused: true, attempt, scored };
+      } else if (attempt.status === "in_progress" && completionStatus === "checking") {
+        setCompletionStatus("");
+        setCompletionError("");
+      }
+      return { attempt, scored };
+    } finally {
+      statusPollInFlight.current = false;
+    }
+  }
+
+  React.useEffect(() => {
+    if (!assessmentAttemptId) return undefined;
+    let active = true;
+    const refresh = () => { if (active) refreshAttemptStatus(); };
+    refresh();
+    const shouldPoll = completionStatus === "checking" || completionStatus === "saving" || completionStatus === "marking" || (serverAttemptStatus === "marking" && completionStatus !== "paused" && completionStatus !== "error");
+    const timer = shouldPoll ? setInterval(refresh, 2000) : null;
+    return () => {
+      active = false;
+      if (timer) clearInterval(timer);
+    };
+  }, [assessmentAttemptId, completionStatus, serverAttemptStatus]);
+
+  async function waitForAssessmentResult() {
+    const deadline = Date.now() + 120000;
+    while (Date.now() < deadline) {
+      await new Promise(resolve => setTimeout(resolve, 1800));
+      const snapshot = await refreshAttemptStatus();
+      if (snapshot?.finalized) return true;
+      if (snapshot?.paused) return false;
+    }
+    setCompletionStatus("paused");
+    setCompletionError("Status checking took too long. Your saved answers are safe. Wait briefly, then press Complete Module once to check or continue scoring.");
+    return false;
+  }
+
   async function completeAssessment() {
     if (completing) return false;
     if (!assessmentAttemptId) {
@@ -1190,15 +1318,29 @@ function ModuleFlow({
         body: JSON.stringify({ attempt_id: assessmentAttemptId, questions })
       });
       const result = await response.json().catch(() => null);
-      if (!response.ok || !result?.success) throw new Error(result?.error || "Could not complete the assessment.");
-      setAssessmentResult(result);
-      if (resumeKey) localStorage.removeItem(resumeKey);
-      onFinish(result.mcq_score, result.mcq_total, result.passed, result);
-      setStep(TOTAL_STEPS - 1);
+      if (response.status === 202 && result?.processing) {
+        setCompletionStatus("marking");
+        return await waitForAssessmentResult();
+      }
+      if (!response.ok || !result?.success) throw new Error(result?.error || "assessment_completion_failed");
+      if (!handleFinalizedAssessment(result)) throw new Error("assessment_completion_failed");
       return true;
     } catch (error) {
-      setCompletionStatus("error");
-      setCompletionError(assessmentErrorMessage(error.message || "assessment_completion_failed"));
+      const code = error.message || "assessment_completion_failed";
+      const snapshot = await refreshAttemptStatus();
+      if (snapshot?.finalized || finalResultHandled.current) return true;
+      if (snapshot?.attempt?.status === "marking" && !snapshot.paused) {
+        setCompletionStatus("marking");
+        setCompletionError("");
+        return await waitForAssessmentResult();
+      }
+      if (snapshot?.paused || code === "marking_lease_lost") {
+        setCompletionStatus("paused");
+        setCompletionError(assessmentErrorMessage(code));
+      } else {
+        setCompletionStatus("error");
+        setCompletionError(assessmentErrorMessage(code));
+      }
       return false;
     } finally {
       setCompleting(false);
@@ -1348,7 +1490,7 @@ function ModuleFlow({
     className: "screen",
     ref: screenRef,
     style: styles.screen
-  }, (inQuiz && (completionStatus || completionError)) && /*#__PURE__*/React.createElement("div", { role: completionStatus === "error" || completionError ? "alert" : "status", "aria-live": completionStatus === "error" || completionError ? "assertive" : "polite", "aria-atomic": "true", style: { ...styles.feedbackBox, ...(completionStatus === "error" || completionError ? styles.feedbackBad : styles.feedbackOk), marginBottom: 14, padding: "18px 20px", borderWidth: 2, boxShadow: "0 4px 14px rgba(49, 40, 31, 0.10)" } }, /*#__PURE__*/React.createElement("strong", { style: { ...styles.feedbackHeading, fontSize: "1rem" } }, completionStatus === "saving" ? "Saving your answers…" : completionStatus === "marking" ? "Your module is being completed…" : "Module completion needs attention"), /*#__PURE__*/React.createElement("p", { style: { ...styles.feedbackText, marginTop: 8 } }, completionStatus === "saving" ? "Please wait. We’re saving your answers before sending them for scoring. Keep this page open and don’t tap Complete Module again." : completionStatus === "marking" ? "Your answers are being scored and your module progress is being updated. This may take a little while. Please wait and don’t tap Complete Module again." : completionError)), step === 0 && /*#__PURE__*/React.createElement(CourseLanding, {
+  }, inQuiz && /*#__PURE__*/React.createElement(CompletionStatusBanner, { status: completionStatus, error: completionError, progress: markingProgress }), step === 0 && /*#__PURE__*/React.createElement(CourseLanding, {
     moduleData: moduleData,
     onStart: next
   }), step >= 1 && step <= lessons.length && /*#__PURE__*/React.createElement(LessonCard, {

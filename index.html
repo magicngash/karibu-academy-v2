@@ -37,7 +37,7 @@ let RESTAURANT_ROUTE_ERROR = "";
 
 // Plain fetch-based RPC helper — no external SDK/script tag required,
 // so this works both in a live artifact preview and as standalone HTML.
-async function callRpc(name, params) {
+async function callRpc(name, params, fetchOptions = {}) {
   const loginRpc = name === "staff_login" || name === "owner_login" || name === "get_restaurant_by_slug";
   const authToken = loginRpc ? null : (() => {
     try { return localStorage.getItem(AUTH_TOKEN_KEY); } catch (_) { return null; }
@@ -51,7 +51,8 @@ async function callRpc(name, params) {
         apikey: SUPABASE_ANON_KEY,
         Authorization: `Bearer ${SUPABASE_ANON_KEY}`
       },
-      body: JSON.stringify(requestParams)
+      body: JSON.stringify(requestParams),
+      ...fetchOptions
     });
     const body = await res.json().catch(() => null);
     if (!res.ok) return {
@@ -1124,7 +1125,8 @@ function ModuleFlow({
   resumeKey,
   isManager,
   onManagerDashboard,
-  onLogout
+  onLogout,
+  resumeSnapshot
 }) {
   const savedProgress = React.useMemo(() => {
     try {
@@ -1133,13 +1135,57 @@ function ModuleFlow({
       return null;
     }
   }, [resumeKey]);
-  const [step, setStep] = React.useState(() => savedProgress?.step || 0); // 0 = course landing page
+  const remoteAttempt = resumeSnapshot?.attempt || null;
+  const resumeAttemptId = remoteAttempt?.id || null;
+  const localMatchesRemoteAttempt = Boolean(savedProgress?.assessmentAttemptId && resumeAttemptId && savedProgress.assessmentAttemptId === resumeAttemptId);
+  const canUseLocalResume = !remoteAttempt || localMatchesRemoteAttempt;
+  const remoteUpdatedAt = Date.parse(remoteAttempt?.updated_at || "") || 0;
+  const localUpdatedAt = Number(savedProgress?.updatedAt) || 0;
+  const useNewerLocalPosition = localMatchesRemoteAttempt && localUpdatedAt > remoteUpdatedAt + 2000;
+  const reviewStepCount = (moduleData.takeaways ? 1 : 0) + (moduleData.caseStudy ? 1 : 0);
+  const maxResumableStep = Math.max(0, moduleData.lessons.length + reviewStepCount + moduleData.quiz.length);
+  const proposedResumeStep = useNewerLocalPosition ? savedProgress.step : remoteAttempt?.current_step ?? savedProgress?.step ?? 0;
+  const initialResumeStep = Math.max(0, Math.min(Number(proposedResumeStep) || 0, maxResumableStep));
+  const writtenKey = resumeKey ? resumeKey.replace("karibu-training:", "karibu-written:") : null;
+  let cachedWrittenState = null;
+  try { cachedWrittenState = writtenKey ? JSON.parse(localStorage.getItem(writtenKey) || "null") : null; } catch (_) {}
+  const serverMcqAnswers = Array.isArray(resumeSnapshot?.mcq_answers) ? resumeSnapshot.mcq_answers : [];
+  const restoredSelectedOptions = [...(canUseLocalResume ? savedProgress?.selectedOptions || [] : [])];
+  serverMcqAnswers.forEach(item => {
+    const index = Number(item.question_index);
+    if (Number.isInteger(index) && index >= 0 && restoredSelectedOptions[index] === undefined) restoredSelectedOptions[index] = Number(item.selected_option_index);
+  });
+  const restoredAnswers = [...(canUseLocalResume ? savedProgress?.answers || [] : [])];
+  restoredSelectedOptions.forEach((value, index) => { if (value !== undefined) restoredAnswers[index] = true; });
+  const localWrittenMatchesRemote = !remoteAttempt || cachedWrittenState?.assessmentAttemptId === resumeAttemptId || (!cachedWrittenState?.assessmentAttemptId && localMatchesRemoteAttempt);
+  const useNewerLocalWritten = Boolean(cachedWrittenState && localWrittenMatchesRemote && (!remoteAttempt || (Number(cachedWrittenState.updatedAt) || 0) > remoteUpdatedAt + 2000));
+  const restoredWrittenResponses = useNewerLocalWritten ? [...(cachedWrittenState.responses || [])] : [];
+  const restoredWrittenSubmitted = useNewerLocalWritten ? [...(cachedWrittenState.submitted || (cachedWrittenState.responses || []).map(value => typeof value === "string" && value.length > 0))] : [];
+  const restoredDraftSaved = useNewerLocalWritten ? [...(cachedWrittenState.draftSaved || [])] : [];
+  const submittedWrittenIndexes = new Set();
+  (resumeSnapshot?.written_answers || []).forEach(item => {
+    const index = Number(item.question_index);
+    if (!Number.isInteger(index) || index < 0) return;
+    submittedWrittenIndexes.add(index);
+    restoredWrittenResponses[index] = item.answer;
+    restoredWrittenSubmitted[index] = true;
+    restoredDraftSaved[index] = false;
+  });
+  (resumeSnapshot?.written_drafts || []).forEach(item => {
+    const index = Number(item.question_index);
+    if (!Number.isInteger(index) || index < 0 || submittedWrittenIndexes.has(index)) return;
+    if (!useNewerLocalWritten || restoredWrittenResponses[index] === undefined) restoredWrittenResponses[index] = item.draft_answer;
+    if (restoredWrittenSubmitted[index] !== true) restoredWrittenSubmitted[index] = false;
+    restoredDraftSaved[index] = true;
+  });
+  const [step, setStep] = React.useState(() => initialResumeStep); // 0 = course landing page
   const [selected, setSelected] = React.useState(null);
-  const [answers, setAnswers] = React.useState(() => savedProgress?.answers || []);
-  const [selectedOptions, setSelectedOptions] = React.useState(() => savedProgress?.selectedOptions || []);
-  const [assessmentAttemptId, setAssessmentAttemptId] = React.useState(() => savedProgress?.assessmentAttemptId || null);
+  const [answers, setAnswers] = React.useState(() => restoredAnswers);
+  const [selectedOptions, setSelectedOptions] = React.useState(() => restoredSelectedOptions);
+  const [assessmentAttemptId, setAssessmentAttemptId] = React.useState(() => resumeAttemptId || savedProgress?.assessmentAttemptId || null);
   const [assessmentResult, setAssessmentResult] = React.useState(null);
   const [completionError, setCompletionError] = React.useState("");
+  const [resumeSaveError, setResumeSaveError] = React.useState("");
   const [completionStatus, setCompletionStatus] = React.useState(() => savedProgress?.assessmentAttemptId ? "checking" : "");
   const [markingProgress, setMarkingProgress] = React.useState({ scored: 0, total: 5, leaseExpiresAt: null });
   const [serverAttemptStatus, setServerAttemptStatus] = React.useState("");
@@ -1148,14 +1194,10 @@ function ModuleFlow({
   const statusPollInFlight = React.useRef(false);
   const finalResultHandled = React.useRef(false);
   const pendingAnswerSaves = React.useRef([]);
-  const writtenKey = resumeKey ? resumeKey.replace("karibu-training:", "karibu-written:") : null;
-  const [writtenResponses, setWrittenResponses] = React.useState(() => {
-    try {
-      return writtenKey ? JSON.parse(localStorage.getItem(writtenKey) || "null")?.responses || [] : [];
-    } catch (_) {
-      return [];
-    }
-  });
+  const pendingDraftSaves = React.useRef([]);
+  const [writtenResponses, setWrittenResponses] = React.useState(() => restoredWrittenResponses);
+  const [writtenSubmitted, setWrittenSubmitted] = React.useState(() => restoredWrittenSubmitted);
+  const [writtenDraftSaved, setWrittenDraftSaved] = React.useState(() => restoredDraftSaved);
   const [writtenSaveStatus, setWrittenSaveStatus] = React.useState("");
   const [writtenSaveError, setWrittenSaveError] = React.useState("");
   const screenRef = React.useRef(null);
@@ -1215,6 +1257,9 @@ function ModuleFlow({
     completionStarted.current = true;
     if (resumeKey) {
       try { localStorage.removeItem(resumeKey); } catch (_) {}
+    }
+    if (writtenKey) {
+      try { localStorage.removeItem(writtenKey); } catch (_) {}
     }
     onFinish(result.mcq_score, result.mcq_total, result.passed === true, result);
     setStep(TOTAL_STEPS - 1);
@@ -1346,8 +1391,32 @@ function ModuleFlow({
       setCompleting(false);
     }
   }
+  async function persistResumeStep(nextStep) {
+    if (!assessmentAttemptId) {
+      setResumeSaveError("Your training session is still connecting. Wait a moment, then try again.");
+      return false;
+    }
+    const { data, error } = await callRpc("save_assessment_resume_step", { p_attempt_id: assessmentAttemptId, p_step_index: nextStep });
+    if (error || !data?.success) {
+      setResumeSaveError("We couldn't save your place to your account. Check your connection and try this step again.");
+      return false;
+    }
+    setResumeSaveError("");
+    return true;
+  }
   async function next() {
     if (completing || completionStarted.current) return;
+    if (pendingAnswerSaves.current.length) {
+      const saves = await Promise.all(pendingAnswerSaves.current);
+      pendingAnswerSaves.current = [];
+      const failedSave = saves.find(result => result?.error || !result?.data?.success);
+      if (failedSave) {
+        setCompletionStatus("error");
+        setCompletionError(assessmentErrorMessage(failedSave.error?.message || failedSave.data?.error || "Your last answer could not be saved. Please try again."));
+        return;
+      }
+    }
+    if (pendingDraftSaves.current.length) await Promise.all(pendingDraftSaves.current);
     const ns = Math.min(step + 1, TOTAL_STEPS - 1);
     if (ns === TOTAL_STEPS - 1) {
       completionStarted.current = true;
@@ -1369,12 +1438,16 @@ function ModuleFlow({
       if (!success) completionStarted.current = false;
       return;
     }
+    if (!await persistResumeStep(ns)) return;
     setCompletionStatus("");
     setStep(ns);
   }
-  function previous() {
+  async function previous() {
     if (completionStarted.current || completing) return;
-    setStep(s => Math.max(0, s - 1));
+    if (pendingDraftSaves.current.length) await Promise.all(pendingDraftSaves.current);
+    const previousStep = Math.max(0, step - 1);
+    if (previousStep === step || !await persistResumeStep(previousStep)) return;
+    setStep(previousStep);
   }
   function selectAnswer(optIdx) {
     if (selectedOptions[quizIndex] !== undefined) return;
@@ -1415,6 +1488,47 @@ function ModuleFlow({
     if (resumeKey) localStorage.removeItem(resumeKey);
     if (writtenKey) localStorage.removeItem(writtenKey);
   }
+  function persistWrittenCache(responses, submitted, draftSaved) {
+    if (!writtenKey) return;
+    try { localStorage.setItem(writtenKey, JSON.stringify({ responses, submitted, draftSaved, assessmentAttemptId, updatedAt: Date.now() })); } catch (_) {}
+  }
+  function updateWrittenDraft(response, shortIndex) {
+    const nextResponses = [...writtenResponses];
+    nextResponses[shortIndex] = response;
+    const nextSubmitted = [...writtenSubmitted];
+    nextSubmitted[shortIndex] = false;
+    const nextDraftSaved = [...writtenDraftSaved];
+    nextDraftSaved[shortIndex] = false;
+    setWrittenResponses(nextResponses);
+    setWrittenSubmitted(nextSubmitted);
+    setWrittenDraftSaved(nextDraftSaved);
+    persistWrittenCache(nextResponses, nextSubmitted, nextDraftSaved);
+  }
+  async function saveWrittenDraft(response, shortIndex, fetchOptions = {}) {
+    if (!assessmentAttemptId || !session?.staffId) return false;
+    const pending = (async () => {
+      const result = await callRpc("save_assessment_written_draft", {
+        p_attempt_id: assessmentAttemptId,
+        p_question_index: shortIndex,
+        p_answer: response
+      }, fetchOptions);
+      if (result.error || !result.data?.success) return false;
+      const nextResponses = [...writtenResponses];
+      nextResponses[shortIndex] = response;
+      const nextSubmitted = [...writtenSubmitted];
+      nextSubmitted[shortIndex] = false;
+      const nextDraftSaved = [...writtenDraftSaved];
+      nextDraftSaved[shortIndex] = Boolean(response.trim());
+      setWrittenResponses(nextResponses);
+      setWrittenSubmitted(nextSubmitted);
+      setWrittenDraftSaved(nextDraftSaved);
+      persistWrittenCache(nextResponses, nextSubmitted, nextDraftSaved);
+      return true;
+    })();
+    pendingDraftSaves.current.push(pending);
+    try { return await pending; }
+    finally { pendingDraftSaves.current = pendingDraftSaves.current.filter(item => item !== pending); }
+  }
   async function submitShortAnswer(response) {
     const shortIndex = quiz.slice(0, quizIndex + 1).filter(question => question.type === "shortAnswer").length - 1;
     if (!session?.staffId || !assessmentAttemptId) {
@@ -1436,10 +1550,14 @@ function ModuleFlow({
     }
     const nextWrittenResponses = [...writtenResponses];
     nextWrittenResponses[shortIndex] = response;
+    const nextWrittenSubmitted = [...writtenSubmitted];
+    nextWrittenSubmitted[shortIndex] = true;
+    const nextWrittenDraftSaved = [...writtenDraftSaved];
+    nextWrittenDraftSaved[shortIndex] = false;
     setWrittenResponses(nextWrittenResponses);
-    if (writtenKey) {
-      try { localStorage.setItem(writtenKey, JSON.stringify({ responses: nextWrittenResponses, updatedAt: Date.now() })); } catch (_) {}
-    }
+    setWrittenSubmitted(nextWrittenSubmitted);
+    setWrittenDraftSaved(nextWrittenDraftSaved);
+    persistWrittenCache(nextWrittenResponses, nextWrittenSubmitted, nextWrittenDraftSaved);
     setWrittenSaveStatus("saved");
     setCompletionError("");
     setAnswers(a => {
@@ -1452,10 +1570,10 @@ function ModuleFlow({
   const currentShortIndex = inQuiz && quiz[quizIndex]?.type === "shortAnswer" ? quiz.slice(0, quizIndex + 1).filter(question => question.type === "shortAnswer").length - 1 : -1;
   React.useEffect(() => {
     if (currentShortIndex >= 0) {
-      setWrittenSaveStatus("");
+      setWrittenSaveStatus(writtenSubmitted[currentShortIndex] ? "saved" : writtenDraftSaved[currentShortIndex] ? "draft-saved" : "");
       setWrittenSaveError("");
     }
-  }, [quizIndex]);
+  }, [quizIndex, currentShortIndex, writtenSubmitted, writtenDraftSaved]);
   return /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
     style: styles.topBar
   }, /*#__PURE__*/React.createElement("button", {
@@ -1490,7 +1608,7 @@ function ModuleFlow({
     className: "screen",
     ref: screenRef,
     style: styles.screen
-  }, inQuiz && /*#__PURE__*/React.createElement(CompletionStatusBanner, { status: completionStatus, error: completionError, progress: markingProgress }), step === 0 && /*#__PURE__*/React.createElement(CourseLanding, {
+  }, resumeSaveError && /*#__PURE__*/React.createElement("div", { role: "alert", style: { ...styles.feedbackBox, ...styles.feedbackBad, marginBottom: 12 } }, resumeSaveError), step === 0 && /*#__PURE__*/React.createElement(CourseLanding, {
     moduleData: moduleData,
     onStart: next
   }), step >= 1 && step <= lessons.length && /*#__PURE__*/React.createElement(LessonCard, {
@@ -1512,9 +1630,16 @@ function ModuleFlow({
     selected: selected,
     onSelect: selectAnswer,
     answer: writtenResponses[currentShortIndex],
+    isAnswerSubmitted: currentShortIndex >= 0 && writtenSubmitted[currentShortIndex] === true,
+    draftSaved: currentShortIndex >= 0 && writtenDraftSaved[currentShortIndex] === true,
+    onDraftChange: response => currentShortIndex >= 0 && updateWrittenDraft(response, currentShortIndex),
+    onDraftSave: (response, fetchOptions) => currentShortIndex >= 0 ? saveWrittenDraft(response, currentShortIndex, fetchOptions) : Promise.resolve(false),
     onSubmitShortAnswer: submitShortAnswer,
     writtenSaveStatus: writtenSaveStatus,
     writtenSaveError: writtenSaveError,
+    completionStatus: completionStatus,
+    completionError: completionError,
+    markingProgress: markingProgress,
     finishing: completionStatus === "saving" || completionStatus === "marking" || completing,
     onNext: next,
     busy: completing || completionStatus === "saving" || completionStatus === "marking"
@@ -1766,6 +1891,13 @@ function QuizCard({
   onSubmitShortAnswer,
   writtenSaveStatus,
   writtenSaveError,
+  isAnswerSubmitted,
+  draftSaved,
+  onDraftChange,
+  onDraftSave,
+  completionStatus,
+  completionError,
+  markingProgress,
   finishing,
   onNext,
   busy
@@ -1779,6 +1911,13 @@ function QuizCard({
       onSubmit: onSubmitShortAnswer,
       saveStatus: writtenSaveStatus,
       saveError: writtenSaveError,
+      isSubmitted: isAnswerSubmitted,
+      draftSaved: draftSaved,
+      onDraftChange: onDraftChange,
+      onDraftSave: onDraftSave,
+      completionStatus: completionStatus,
+      completionError: completionError,
+      markingProgress: markingProgress,
       finishing: finishing,
       onNext: onNext,
       busy: busy
@@ -1816,7 +1955,7 @@ function QuizCard({
     style: styles.feedbackHeading
   }, "Answer recorded"), /*#__PURE__*/React.createElement("p", {
     style: styles.feedbackText
-  }, "Your final score is calculated securely when you complete the module.")), answered && /*#__PURE__*/React.createElement("button", {
+  }, "Your final score is calculated securely when you complete the module.")), index === count - 1 && /*#__PURE__*/React.createElement(CompletionStatusBanner, { status: completionStatus, error: completionError, progress: markingProgress }), answered && /*#__PURE__*/React.createElement("button", {
     style: styles.primaryBtn,
     onClick: onNext,
     disabled: busy,
@@ -1834,21 +1973,71 @@ function ShortAnswerCard({
   onSubmit,
   saveStatus,
   saveError,
+  isSubmitted,
+  draftSaved,
+  onDraftChange,
+  onDraftSave,
+  completionStatus,
+  completionError,
+  markingProgress,
   finishing,
   onNext,
   busy
 }) {
   const [draft, setDraft] = React.useState(answer || "");
-  const submitted = saveStatus === "saved" && typeof answer === "string";
+  const [draftSaveStatus, setDraftSaveStatus] = React.useState(draftSaved ? "saved" : "");
+  const [draftSaveError, setDraftSaveError] = React.useState("");
+  const draftTimer = React.useRef(null);
+  const draftSavePromise = React.useRef(Promise.resolve(true));
+  const serverDraftExists = React.useRef(Boolean(draftSaved));
+  const submitted = Boolean(isSubmitted) || (saveStatus === "saved" && typeof answer === "string");
+  const latestDraftState = React.useRef(null);
+  latestDraftState.current = { draft, submitted, onDraftSave };
+  React.useEffect(() => {
+    function saveDraftOnPageHide() {
+      const current = latestDraftState.current;
+      if (!current || current.submitted || !current.draft.trim()) return;
+      Promise.resolve(current.onDraftSave(current.draft.trim(), { keepalive: true })).catch(() => {});
+    }
+    window.addEventListener("pagehide", saveDraftOnPageHide);
+    return () => window.removeEventListener("pagehide", saveDraftOnPageHide);
+  }, []);
   const saving = saveStatus === "saving";
-  const needsServerSave = typeof answer === "string" && !submitted && !saving;
+  const needsServerSave = Boolean(draft.trim()) && !submitted && !["saved", "saving"].includes(draftSaveStatus);
   React.useEffect(() => {
     setDraft(answer || "");
   }, [answer, data.q]);
-  function submit() {
+  function queueDraftSave(value, immediate = false) {
+    if (draftTimer.current) clearTimeout(draftTimer.current);
+    if (submitted || (!value.trim() && !serverDraftExists.current)) return;
+    setDraftSaveError("");
+    setDraftSaveStatus("pending");
+    const save = async () => {
+      const previous = draftSavePromise.current;
+      const nextSave = Promise.resolve(previous).catch(() => false).then(async () => {
+        setDraftSaveStatus("saving");
+        const ok = await onDraftSave(value.trim());
+        serverDraftExists.current = ok && Boolean(value.trim());
+        setDraftSaveStatus(ok ? value.trim() ? "saved" : "cleared" : "error");
+        if (!ok) setDraftSaveError("This draft could not be synced to your account yet. Keep this page open and try again.");
+        return ok;
+      });
+      draftSavePromise.current = nextSave;
+      await nextSave;
+    };
+    if (immediate) save();
+    else draftTimer.current = setTimeout(save, 650);
+  }
+  async function submit() {
     const response = draft.trim();
     if (!response || submitted) return;
-    onSubmit(response);
+    if (draftTimer.current) clearTimeout(draftTimer.current);
+    await Promise.resolve(draftSavePromise.current).catch(() => false);
+    const ok = await onSubmit(response);
+    if (ok) {
+      setDraftSaveStatus("saved");
+      setDraftSaveError("");
+    }
   }
   return /*#__PURE__*/React.createElement("div", {
     style: styles.cardWrap
@@ -1863,7 +2052,13 @@ function ShortAnswerCard({
     style: styles.shortAnswerHint
   }, "Write a brief answer in your own words."), /*#__PURE__*/React.createElement("textarea", {
     value: draft,
-    onChange: event => setDraft(event.target.value),
+    onChange: event => {
+      const value = event.target.value;
+      setDraft(value);
+      onDraftChange(value);
+      queueDraftSave(value);
+    },
+    onBlur: () => queueDraftSave(draft, true),
     onInput: event => {
       event.currentTarget.style.height = "auto";
       event.currentTarget.style.height = `${event.currentTarget.scrollHeight}px`;
@@ -1875,7 +2070,8 @@ function ShortAnswerCard({
   }), needsServerSave && /*#__PURE__*/React.createElement("p", {
     role: "status",
     style: styles.shortAnswerHint
-  }, "This response is saved on this device but has not been confirmed in the server yet. Press Save response before continuing."), saveError && /*#__PURE__*/React.createElement("div", {
+  }, "Your draft is being saved to your account. Press Save response before continuing."), draftSaveStatus === "saving" && /*#__PURE__*/React.createElement("p", { role: "status", style: styles.shortAnswerHint }, "Saving draft to your account…"), draftSaveStatus === "saved" && !submitted && /*#__PURE__*/React.createElement("p", { role: "status", style: styles.shortAnswerHint }, "Draft saved to your account. Press Save response before continuing."), draftSaveError && /*#__PURE__*/React.createElement("div", { role: "alert", style: { ...styles.feedbackBox, ...styles.feedbackBad } }, draftSaveError), saveError && /*#__PURE__*/React.createElement("div", {
+  }, "Your draft is being saved to your account. Press Save response before continuing."), draftSaveStatus === "saving" && /*#__PURE__*/React.createElement("p", { role: "status", style: styles.shortAnswerHint }, "Saving draft to your account…"), draftSaveStatus === "saved" && !submitted && /*#__PURE__*/React.createElement("p", { role: "status", style: styles.shortAnswerHint }, "Draft saved to your account. Press Save response before continuing."), draftSaveStatus === "cleared" && /*#__PURE__*/React.createElement("p", { role: "status", style: styles.shortAnswerHint }, "Draft cleared from your account."), draftSaveError && /*#__PURE__*/React.createElement("div", { role: "alert", style: { ...styles.feedbackBox, ...styles.feedbackBad } }, draftSaveError), saveError && /*#__PURE__*/React.createElement("div", {
     role: "alert",
     style: { ...styles.feedbackBox, ...styles.feedbackBad }
   }, saveError), !submitted && /*#__PURE__*/React.createElement("button", {
@@ -1897,7 +2093,7 @@ function ShortAnswerCard({
     style: styles.feedbackHeading
   }, "Response saved"), /*#__PURE__*/React.createElement("p", {
     style: styles.feedbackText
-  }, "Your written response has been recorded for discussion or review.")), submitted && /*#__PURE__*/React.createElement("button", {
+  }, "Your written response has been recorded for discussion or review.")), index === count - 1 && /*#__PURE__*/React.createElement(CompletionStatusBanner, { status: completionStatus, error: completionError, progress: markingProgress }), submitted && /*#__PURE__*/React.createElement("button", {
     style: styles.primaryBtn,
     onClick: onNext,
     disabled: busy,
@@ -2258,13 +2454,37 @@ function Login({
 // =====================================================================
 // SIGNED-IN LANDING (shown right after login, before onboarding)
 // =====================================================================
+function getResumeLocationLabel(resume) {
+  const attempt = resume?.attempt || {};
+  const moduleId = Number(attempt.module_id || resume?.moduleId);
+  const data = MODULE_DATA[moduleId];
+  if (!data) return `Module ${moduleId || "training"}`;
+  const step = Math.max(0, Number(attempt.current_step) || 0);
+  const lessons = data.lessons || [];
+  const reviewCount = (data.takeaways ? 1 : 0) + (data.caseStudy ? 1 : 0);
+  const quizStart = 1 + lessons.length + reviewCount;
+  if (step === 0) return `${data.topBarLabel || `Module ${moduleId}`} · Overview`;
+  if (step <= lessons.length) return `${data.topBarLabel || `Module ${moduleId}`} · Lesson ${step} of ${lessons.length}`;
+  if (step < quizStart) return `${data.topBarLabel || `Module ${moduleId}`} · Review section`;
+  const question = Math.min(step - quizStart + 1, (data.quiz || []).length);
+  return `${data.topBarLabel || `Module ${moduleId}`} · Assessment question ${Math.max(1, question)} of ${(data.quiz || []).length}`;
+}
 function SignedInLanding({
   branding,
   session,
   onContinue,
-  onManagerDashboard
+  onManagerDashboard,
+  resumeTraining,
+  resumeLookupError,
+  onRetryResume,
+  onResume
 }) {
   const isManager = session.role === "manager";
+  const resumeAttempt = resumeTraining?.attempt || {};
+  const resumeModuleId = Number(resumeAttempt.module_id || resumeTraining?.moduleId);
+  const resumeModule = MODULES.find(module => module.id === resumeModuleId);
+  const resumeTitle = resumeModule?.title || resumeModule?.name || MODULE_DATA[resumeModuleId]?.topBarLabel || `Module ${resumeModuleId}`;
+  const resumeLocation = getResumeLocationLabel(resumeTraining);
   return /*#__PURE__*/React.createElement("div", {
     className: "screen",
     style: styles.screen
@@ -2292,7 +2512,10 @@ function SignedInLanding({
     style: styles.feedbackHeading
   }, "Payment overdue"), /*#__PURE__*/React.createElement("p", {
     style: styles.feedbackText
-  }, "This restaurant's Karibu Academy subscription has an overdue payment. Staff can still train for now, but please settle the invoice to avoid account suspension.")), isManager ? /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("button", {
+  }, "This restaurant's Karibu Academy subscription has an overdue payment. Staff can still train for now, but please settle the invoice to avoid account suspension.")), resumeLookupError && /*#__PURE__*/React.createElement("div", { role: "alert", style: { ...styles.feedbackBox, ...styles.feedbackBad, textAlign: "left", marginTop: 12 } }, /*#__PURE__*/React.createElement("p", { style: styles.feedbackText }, resumeLookupError), /*#__PURE__*/React.createElement("button", { type: "button", style: styles.secondaryBtn, onClick: onRetryResume }, "Check again")), resumeTraining && /*#__PURE__*/React.createElement("section", {
+    "aria-labelledby": "resume-training-title",
+    style: { ...styles.feedbackBox, textAlign: "left", marginTop: 16, border: `2px solid ${COLORS.marigoldDark}`, background: "#fffdf9", boxShadow: "0 8px 20px rgba(49, 40, 31, 0.12)" }
+  }, /*#__PURE__*/React.createElement("h2", { id: "resume-training-title", style: { ...styles.feedbackHeading, fontSize: "1.15rem", marginBottom: 6 } }, "Resume Training"), /*#__PURE__*/React.createElement("p", { style: { ...styles.feedbackText, marginTop: 0 } }, "Pick up where you left off: ", resumeTitle, ". ", resumeLocation, "."), /*#__PURE__*/React.createElement("button", { type: "button", style: { ...styles.primaryBtn, width: "100%", marginTop: 10 }, onClick: onResume }, "Resume Training ", /*#__PURE__*/React.createElement(Icon, { name: "arrow", className: "icon-sm" }))), isManager ? /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("button", {
     style: {
       ...styles.primaryBtn,
       marginTop: 18
@@ -2954,6 +3177,9 @@ function App() {
   const [session, setSession] = React.useState(null); // { staffId, fullName, role }
   const [activeMod, setActiveMod] = React.useState(null);
   const [completedIds, setCompletedIds] = React.useState([]);
+  const [resumeTraining, setResumeTraining] = React.useState(null);
+  const [resumeLookupError, setResumeLookupError] = React.useState("");
+  const [moduleResumeSnapshot, setModuleResumeSnapshot] = React.useState(null);
   const [branding, setBranding] = React.useState({
     name: "Restaurant",
     app_name: "Karibu Academy"
@@ -3012,6 +3238,9 @@ function App() {
 
   async function handleLoggedIn(newSession) {
     setSession(newSession);
+    setResumeTraining(null);
+    setResumeLookupError("");
+    setModuleResumeSnapshot(null);
     // Hydrate progress from the database for this staff member
     const {
       data
@@ -3047,14 +3276,33 @@ function App() {
         // Ignore malformed local resume data and continue signing in.
       }
     }
+    const { data: latestResumeData, error: latestResumeError } = await callRpc("get_latest_training_resume", {});
+    const resumeLookupFailed = Boolean(latestResumeError || !latestResumeData?.success);
+    if (resumeLookupFailed) setResumeLookupError("We couldn't check your saved training position. Tap Check again, or contact your manager before restarting a module.");
+    let resumeCandidate = latestResumeData?.success ? latestResumeData.resume : null;
+    if (resumeCandidate?.attempt && latestResume?.saved?.assessmentAttemptId === resumeCandidate.attempt.id) {
+      const localTime = Number(latestResume.saved.updatedAt) || 0;
+      const remoteTime = Date.parse(resumeCandidate.attempt.updated_at || "") || 0;
+      if (localTime > remoteTime + 2000) {
+        resumeCandidate = { ...resumeCandidate, attempt: { ...resumeCandidate.attempt, current_step: latestResume.saved.step }, localSnapshot: latestResume.saved };
+      }
+    }
+    if (!resumeCandidate?.attempt && latestResume) {
+      let legacyAttempt = null;
+      if (latestResume.saved.assessmentAttemptId) {
+        const { data: attemptData } = await callRpc("get_assessment_attempt_for_staff", { p_attempt_id: latestResume.saved.assessmentAttemptId });
+        if (attemptData?.success && !["passed", "failed", "revoked"].includes(attemptData.attempt?.status)) legacyAttempt = attemptData;
+      }
+      if (legacyAttempt?.attempt) resumeCandidate = { ...legacyAttempt, written_drafts: [], localSnapshot: latestResume.saved };
+      else if (!latestResume.saved.assessmentAttemptId) resumeCandidate = { attempt: { id: null, module_id: latestResume.moduleId, current_step: latestResume.saved.step || 0, status: "in_progress" }, mcq_answers: [], written_answers: [], written_drafts: [], localSnapshot: latestResume.saved };
+    }
+    if (resumeCandidate?.attempt) setResumeTraining(resumeCandidate);
     const onboardingKey = `karibu-training:${RESTAURANT_ID}:${newSession.staffId}:onboarding`;
     const lastPageKey = `karibu-last-page:${RESTAURANT_ID}:${newSession.staffId}`;
     let lastPage = null;
     try { lastPage = JSON.parse(localStorage.getItem(lastPageKey) || "null"); } catch (_) {}
-    if (latestResume) {
-      const resumeModule = MODULES.find(m => m.id === latestResume.moduleId);
-      setActiveMod(resumeModule);
-      setScreen("module");
+    if (resumeCandidate?.attempt || resumeLookupFailed) {
+      setScreen("signed-in");
     } else if (lastPage?.screen === "home") {
       setScreen("home");
     } else if (lastPage?.screen === "manager-dashboard" && newSession.role === "manager") {
@@ -3067,6 +3315,25 @@ function App() {
     } else {
       setScreen("signed-in");
     }
+  }
+  function handleResumeTraining() {
+    const snapshot = resumeTraining;
+    const attempt = snapshot?.attempt || {};
+    const moduleId = Number(attempt.module_id || snapshot?.moduleId);
+    const module = MODULES.find(item => item.id === moduleId);
+    if (!module || !MODULE_DATA[moduleId]) return;
+    setModuleResumeSnapshot(snapshot);
+    setActiveMod(module);
+    setScreen("module");
+  }
+  async function retryResumeLookup() {
+    setResumeLookupError("");
+    const { data, error } = await callRpc("get_latest_training_resume", {});
+    if (error || !data?.success) {
+      setResumeLookupError("We couldn't check your saved training position. Check your connection and try again.");
+      return;
+    }
+    setResumeTraining(data.resume?.attempt ? data.resume : null);
   }
   async function handleLogout() {
     if (session?.staffId) {
@@ -3083,10 +3350,14 @@ function App() {
     try { localStorage.removeItem(AUTH_TOKEN_KEY); } catch (_) {}
     setSessionId(null);
     setCompletedIds([]);
+    setResumeTraining(null);
+    setResumeLookupError("");
+    setModuleResumeSnapshot(null);
     setActiveMod(null);
     setScreen("login");
   }
   function selectModule(mod) {
+    setModuleResumeSnapshot(null);
     setActiveMod(mod);
     setScreen(mod.available ? "module" : "coming-soon");
   }
@@ -3104,6 +3375,8 @@ function App() {
     }
   }
   async function finishModule(moduleId, score, total, passed) {
+    setResumeTraining(current => Number(current?.attempt?.module_id) === Number(moduleId) ? null : current);
+    setModuleResumeSnapshot(null);
     if (passed) {
       setCompletedIds(ids => ids.includes(moduleId) ? ids : [...ids, moduleId]);
     } else {
@@ -3130,7 +3403,11 @@ function App() {
   }), screen === "signed-in" && session && /*#__PURE__*/React.createElement(SignedInLanding, {
     branding: branding,
     session: session,
-    onContinue: () => setScreen("welcome"),
+    resumeTraining: resumeTraining,
+    resumeLookupError: resumeLookupError,
+    onRetryResume: retryResumeLookup,
+    onResume: handleResumeTraining,
+    onContinue: () => setScreen(resumeTraining || resumeLookupError ? "home" : "welcome"),
     onManagerDashboard: () => setScreen("manager-dashboard")
   }), screen === "welcome" && /*#__PURE__*/React.createElement(Welcome, {
     restaurantName: branding.name,
@@ -3153,6 +3430,7 @@ function App() {
     session: session,
     onExit: exitToHome,
     resumeKey: `karibu-training:${RESTAURANT_ID}:${session?.staffId}:module:${activeMod.id}`,
+    resumeSnapshot: moduleResumeSnapshot,
     onFinish: (score, total, passed) => finishModule(activeMod.id, score, total, passed),
     onNextModule: () => continueToNextModule(activeMod.id),
     isManager: session?.role === "manager",

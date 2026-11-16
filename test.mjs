@@ -12,6 +12,7 @@ const endpoint = await read("netlify/functions/mark-written-answer.mjs");
 const completionEndpoint = await read("netlify/functions/complete-assessment.mjs");
 const markingMigration = await read("15_assessment_marking_progress.sql");
 const resumeMigration = await read("16_training_resume.sql");
+const attemptAccessMigration = await read("17_assessment_attempt_rpc_access.sql");
 const migration = await read("08_security_and_review_fixes.sql");
 const verification = await read("09_security_verification.sql");
 const pkg = JSON.parse(await read("package.json"));
@@ -36,6 +37,7 @@ assert(index.includes("don’t click Complete Module again") && index.includes('
 assert(index.includes('"Processing…"') && index.includes("completionStarted.current"), "module completion does not prevent repeat taps or show processing feedback");
 assert(index.includes("Scoring written answers:") && index.includes("of ${total}"), "learner status does not show persisted written-answer scoring progress as text");
 assert(index.includes('callRpc("get_assessment_attempt_for_staff"') && index.includes("waitForAssessmentResult"), "completion state cannot be checked or recovered from saved server status");
+assert(attemptAccessMigration.includes("revoke all on function public.get_assessment_attempt_for_staff(uuid, text)") && attemptAccessMigration.includes("from public, anon, authenticated") && attemptAccessMigration.includes("grant execute on function public.get_assessment_attempt_for_staff(uuid, text)") && attemptAccessMigration.includes("to anon, authenticated, service_role"), "attempt-status RPC is not granted narrowly to app roles with server role retained");
 assert(completionEndpoint.includes('begin_assessment_marking') && completionEndpoint.includes('save_assessment_marking_score'), "completion endpoint does not start durable marking or save each score");
 assert(completionEndpoint.includes('finalize_assessment_marking') && completionEndpoint.includes('pause_assessment_marking'), "completion endpoint does not finalize or safely pause resumable marking");
 assert(markingMigration.includes("marking_lease_expires_at") && markingMigration.includes("marking_last_error"), "assessment marking migration lacks a recovery lease or saved error state");

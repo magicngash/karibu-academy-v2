@@ -14,10 +14,13 @@ const markingMigration = await read("15_assessment_marking_progress.sql");
 const resumeMigration = await read("16_training_resume.sql");
 const attemptAccessMigration = await read("17_assessment_attempt_rpc_access.sql");
 const retakeMigration = await read("18_atomic_retake_attempt.sql");
+const blankRetakeMigration = await read("19_recover_blank_retake_attempt.sql");
 const migration = await read("08_security_and_review_fixes.sql");
 const verification = await read("09_security_verification.sql");
 const pkg = JSON.parse(await read("package.json"));
 const retakeHandler = index.slice(index.indexOf("async function retake()"), index.indexOf("function persistWrittenCache"));
+const resumeTrainingHandler = index.slice(index.indexOf("async function handleResumeTraining()"), index.indexOf("async function retryResumeLookup"));
+const blankRetakeHelper = index.slice(index.indexOf("function isBlankUnstartedRetake(resume)"), index.indexOf("function getResumeLocationLabel(resume)"));
 
 assert(!/\bcorrect\s*:/.test(index), "frontend still contains MCQ answer keys");
 assert(!/\bmodelAnswer\s*:/.test(index), "frontend still contains case-study model answers");
@@ -29,6 +32,10 @@ assert(index.includes("Draft saved to your account") && index.includes('callRpc(
 assert(index.includes('window.addEventListener("pagehide", saveDraftOnPageHide)') && index.includes("keepalive: true"), "the latest written draft is not flushed when the learner leaves the page");
 assert(index.includes('callRpc("get_latest_training_resume"') && index.includes("getResumeLocationLabel") && index.includes('"Resume Training"'), "signed-in landing does not offer a server-backed resume action");
 assert(index.includes("resumeLookupError") && index.includes("onRetryResume") && index.includes("Check again"), "a failed resume lookup is hidden instead of retryable");
+assert(blankRetakeMigration.includes("create or replace function public.recover_blank_assessment_retake") && blankRetakeMigration.includes("for update") && blankRetakeMigration.includes("previous_attempt.status='failed'") && ["assessment_mcq_answers", "assessment_written_answers", "assessment_written_drafts"].every(table => blankRetakeMigration.includes(table)) && blankRetakeMigration.includes("grant execute on function public.recover_blank_assessment_retake") && blankRetakeMigration.includes("to anon,authenticated,service_role"), "blank-retake recovery is not transactionally guarded and narrowly granted");
+assert(blankRetakeHelper.includes('attempt.status === "in_progress"') && blankRetakeHelper.includes("Number(attempt.attempt_number) > 1") && blankRetakeHelper.includes("Number(attempt.current_step) === 0") && ["resume?.mcq_answers", "resume?.written_answers", "resume?.written_drafts"].every(key => blankRetakeHelper.includes(key)), "blank-retake recovery does not require an active later attempt with no saved answer or draft rows");
+assert(resumeTrainingHandler.includes('callRpc("recover_blank_assessment_retake"') && resumeTrainingHandler.includes("p_step_index: quizStartStep") && resumeTrainingHandler.includes("Number(savedPosition.current_step) !== quizStartStep") && resumeTrainingHandler.includes("setModuleResumeSnapshot(snapshot)"), "Resume Training does not atomically persist and verify the recovered exam position before opening it");
+assert(index.includes("· Retake exam"), "the resume card does not label a pristine later attempt as a retake");
 assert(index.includes('callRpc("save_assessment_resume_step"') && index.includes("resumeSnapshot?.mcq_answers") && index.includes("resumeSnapshot?.written_answers"), "server resume does not save the current step and restore submitted answers");
 assert(index.includes("async function persistResumeStep") && index.includes("if (!await persistResumeStep(ns)) return"), "module navigation is not gated on saving the next resume position");
 assert(index.includes('index === count - 1 && /*#__PURE__*/React.createElement(CompletionStatusBanner') && !index.includes('inQuiz && /*#__PURE__*/React.createElement(CompletionStatusBanner'), "completion status is not located with the final quiz action");

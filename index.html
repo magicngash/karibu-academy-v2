@@ -2516,6 +2516,14 @@ function Login({
 // =====================================================================
 // SIGNED-IN LANDING (shown right after login, before onboarding)
 // =====================================================================
+function isBlankUnstartedRetake(resume) {
+  const attempt = resume?.attempt || {};
+  const answerCollections = [resume?.mcq_answers, resume?.written_answers, resume?.written_drafts];
+  return attempt.status === "in_progress"
+    && Number(attempt.attempt_number) > 1
+    && Number(attempt.current_step) === 0
+    && answerCollections.every(items => Array.isArray(items) && items.length === 0);
+}
 function getResumeLocationLabel(resume) {
   const attempt = resume?.attempt || {};
   const moduleId = Number(attempt.module_id || resume?.moduleId);
@@ -2525,6 +2533,7 @@ function getResumeLocationLabel(resume) {
   const lessons = data.lessons || [];
   const reviewCount = (data.takeaways ? 1 : 0) + (data.caseStudy ? 1 : 0);
   const quizStart = 1 + lessons.length + reviewCount;
+  if (isBlankUnstartedRetake(resume)) return `${data.topBarLabel || `Module ${moduleId}`} · Retake exam`;
   if (step === 0) return `${data.topBarLabel || `Module ${moduleId}`} · Overview`;
   if (step <= lessons.length) return `${data.topBarLabel || `Module ${moduleId}`} · Lesson ${step} of ${lessons.length}`;
   if (step < quizStart) return `${data.topBarLabel || `Module ${moduleId}`} · Review section`;
@@ -3378,12 +3387,39 @@ function App() {
       setScreen("signed-in");
     }
   }
-  function handleResumeTraining() {
-    const snapshot = resumeTraining;
+  async function handleResumeTraining() {
+    let snapshot = resumeTraining;
     const attempt = snapshot?.attempt || {};
     const moduleId = Number(attempt.module_id || snapshot?.moduleId);
     const module = MODULES.find(item => item.id === moduleId);
     if (!module || !MODULE_DATA[moduleId]) return;
+    setResumeLookupError("");
+    if (isBlankUnstartedRetake(snapshot)) {
+      const data = MODULE_DATA[moduleId];
+      const quizStartStep = 1 + (data.lessons || []).length + (data.takeaways ? 1 : 0) + (data.caseStudy ? 1 : 0);
+      const { data: savedPosition, error } = await callRpc("recover_blank_assessment_retake", {
+        p_attempt_id: attempt.id,
+        p_step_index: quizStartStep
+      });
+      if (error || !savedPosition?.success || savedPosition.attempt_id !== attempt.id || Number(savedPosition.current_step) !== quizStartStep) {
+        setResumeLookupError("We couldn't safely move this retake to the exam. No saved answers were changed. Check your connection and tap Resume Training again; if it persists, contact your manager.");
+        return;
+      }
+      snapshot = {
+        ...snapshot,
+        attempt: { ...attempt, current_step: quizStartStep, updated_at: new Date().toISOString() }
+      };
+      setResumeTraining(snapshot);
+      const resumeKey = `karibu-training:${RESTAURANT_ID}:${session?.staffId}:module:${moduleId}`;
+      const writtenKey = resumeKey.replace("karibu-training:", "karibu-written:");
+      try {
+        const saved = JSON.parse(localStorage.getItem(resumeKey) || "null");
+        const localState = saved?.assessmentAttemptId === attempt.id ? saved : { answers: [], selectedOptions: [] };
+        localStorage.setItem(resumeKey, JSON.stringify({ ...localState, step: quizStartStep, assessmentAttemptId: attempt.id, updatedAt: Date.now() }));
+        const written = JSON.parse(localStorage.getItem(writtenKey) || "null");
+        if (written && written.assessmentAttemptId !== attempt.id) localStorage.removeItem(writtenKey);
+      } catch (_) {}
+    }
     setModuleResumeSnapshot(snapshot);
     setActiveMod(module);
     setScreen("module");

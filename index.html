@@ -1490,9 +1490,10 @@ function ModuleFlow({
     setRetaking(true);
     setCompletionError("");
     try {
-      const { data, error } = await callRpc("start_assessment_attempt", {
+      const { data, error } = await callRpc("start_assessment_retake_attempt", {
         p_staff_id: session.staffId,
-        p_module_id: moduleId
+        p_module_id: moduleId,
+        p_step_index: quizStartIndex
       });
       if (error || !data?.success || !data?.attempt_id) {
         const code = error?.message || data?.error || "assessment_attempt_start_failed";
@@ -1504,13 +1505,6 @@ function ModuleFlow({
         return;
       }
       assessmentAttemptIdRef.current = data.attempt_id;
-      const resumePosition = await callRpc("save_assessment_resume_step", {
-        p_attempt_id: data.attempt_id,
-        p_step_index: quizStartIndex
-      });
-      const resumePositionError = resumePosition.error || !resumePosition.data?.success
-        ? "We couldn't save your exam position to your account. Your answers can still be entered here; check your connection before leaving this page."
-        : "";
       try {
         if (resumeKey) localStorage.removeItem(resumeKey);
         if (writtenKey) localStorage.removeItem(writtenKey);
@@ -1523,7 +1517,7 @@ function ModuleFlow({
       setWrittenDraftSaved([]);
       setWrittenSaveStatus("");
       setWrittenSaveError("");
-      setResumeSaveError(resumePositionError);
+      setResumeSaveError("");
       setAssessmentResult(null);
       setCompletionError("");
       setCompletionStatus("");

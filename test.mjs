@@ -15,6 +15,7 @@ const resumeMigration = await read("16_training_resume.sql");
 const attemptAccessMigration = await read("17_assessment_attempt_rpc_access.sql");
 const retakeMigration = await read("18_atomic_retake_attempt.sql");
 const blankRetakeMigration = await read("19_recover_blank_retake_attempt.sql");
+const whitespaceMigration = await read("20_preserve_written_draft_whitespace.sql");
 const migration = await read("08_security_and_review_fixes.sql");
 const verification = await read("09_security_verification.sql");
 const pkg = JSON.parse(await read("package.json"));
@@ -29,6 +30,9 @@ assert(!/\bsample\s*:/.test(index), "frontend still contains written-answer samp
 assert(index.includes('callRpc("save_assessment_written_answer"'), "written answers are not saved against the active assessment attempt");
 assert(index.includes('role: "alert"') && index.includes("Retry save"), "written-answer save failures are not visible and retryable");
 assert(index.includes("Draft saved to your account") && index.includes('callRpc("save_assessment_written_draft"'), "written-answer drafts are not visibly confirmed after server autosave");
+assert(index.includes("await onDraftSave(value);") && index.includes("current.onDraftSave(current.draft, { keepalive: true })") && !index.includes("onDraftSave(value.trim())") && !index.includes("current.onDraftSave(current.draft.trim()"), "written-answer autosave trims whitespace before saving and can join words when a learner pauses");
+assert(index.split('"Draft saved to your account. Press Save response before continuing."').length - 1 === 1, "the draft-saved confirmation is rendered more than once");
+assert(whitespaceMigration.includes("security definer") && whitespaceMigration.includes("for update") && whitespaceMigration.includes("values(p_attempt_id,p_question_index,p_answer,now())") && whitespaceMigration.includes("length(btrim(coalesce(p_answer,'')))=0"), "the database draft saver does not preserve meaningful whitespace while validating and clearing blank drafts");
 assert(index.includes('window.addEventListener("pagehide", saveDraftOnPageHide)') && index.includes("keepalive: true"), "the latest written draft is not flushed when the learner leaves the page");
 assert(index.includes('callRpc("get_latest_training_resume"') && index.includes("getResumeLocationLabel") && index.includes('"Resume Training"'), "signed-in landing does not offer a server-backed resume action");
 assert(index.includes("resumeLookupError") && index.includes("onRetryResume") && index.includes("Check again"), "a failed resume lookup is hidden instead of retryable");

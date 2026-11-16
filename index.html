@@ -2047,13 +2047,13 @@ function ShortAnswerCard({
     function saveDraftOnPageHide() {
       const current = latestDraftState.current;
       if (!current || current.submitted || !current.draft.trim()) return;
-      Promise.resolve(current.onDraftSave(current.draft.trim(), { keepalive: true })).catch(() => {});
+      Promise.resolve(current.onDraftSave(current.draft, { keepalive: true })).catch(() => {});
     }
     window.addEventListener("pagehide", saveDraftOnPageHide);
     return () => window.removeEventListener("pagehide", saveDraftOnPageHide);
   }, []);
   const saving = saveStatus === "saving";
-  const needsServerSave = Boolean(draft.trim()) && !submitted && !["saved", "saving"].includes(draftSaveStatus);
+  const needsServerSave = Boolean(draft.trim()) && !submitted && ["", "pending"].includes(draftSaveStatus);
   React.useEffect(() => {
     setDraft(answer || "");
   }, [answer, data.q]);
@@ -2066,7 +2066,7 @@ function ShortAnswerCard({
       const previous = draftSavePromise.current;
       const nextSave = Promise.resolve(previous).catch(() => false).then(async () => {
         setDraftSaveStatus("saving");
-        const ok = await onDraftSave(value.trim());
+        const ok = await onDraftSave(value);
         serverDraftExists.current = ok && Boolean(value.trim());
         setDraftSaveStatus(ok ? value.trim() ? "saved" : "cleared" : "error");
         if (!ok) setDraftSaveError("This draft could not be synced to your account yet. Keep this page open and try again.");
@@ -2120,8 +2120,19 @@ function ShortAnswerCard({
   }), needsServerSave && /*#__PURE__*/React.createElement("p", {
     role: "status",
     style: styles.shortAnswerHint
-  }, "Your draft is being saved to your account. Press Save response before continuing."), draftSaveStatus === "saving" && /*#__PURE__*/React.createElement("p", { role: "status", style: styles.shortAnswerHint }, "Saving draft to your account…"), draftSaveStatus === "saved" && !submitted && /*#__PURE__*/React.createElement("p", { role: "status", style: styles.shortAnswerHint }, "Draft saved to your account. Press Save response before continuing."), draftSaveError && /*#__PURE__*/React.createElement("div", { role: "alert", style: { ...styles.feedbackBox, ...styles.feedbackBad } }, draftSaveError), saveError && /*#__PURE__*/React.createElement("div", {
-  }, "Your draft is being saved to your account. Press Save response before continuing."), draftSaveStatus === "saving" && /*#__PURE__*/React.createElement("p", { role: "status", style: styles.shortAnswerHint }, "Saving draft to your account…"), draftSaveStatus === "saved" && !submitted && /*#__PURE__*/React.createElement("p", { role: "status", style: styles.shortAnswerHint }, "Draft saved to your account. Press Save response before continuing."), draftSaveStatus === "cleared" && /*#__PURE__*/React.createElement("p", { role: "status", style: styles.shortAnswerHint }, "Draft cleared from your account."), draftSaveError && /*#__PURE__*/React.createElement("div", { role: "alert", style: { ...styles.feedbackBox, ...styles.feedbackBad } }, draftSaveError), saveError && /*#__PURE__*/React.createElement("div", {
+  }, "Your draft is being saved to your account. Press Save response before continuing."), draftSaveStatus === "saving" && /*#__PURE__*/React.createElement("p", {
+    role: "status",
+    style: styles.shortAnswerHint
+  }, "Saving draft to your account…"), draftSaveStatus === "saved" && !submitted && /*#__PURE__*/React.createElement("p", {
+    role: "status",
+    style: styles.shortAnswerHint
+  }, "Draft saved to your account. Press Save response before continuing."), draftSaveStatus === "cleared" && /*#__PURE__*/React.createElement("p", {
+    role: "status",
+    style: styles.shortAnswerHint
+  }, "Draft cleared from your account."), draftSaveError && /*#__PURE__*/React.createElement("div", {
+    role: "alert",
+    style: { ...styles.feedbackBox, ...styles.feedbackBad }
+  }, draftSaveError), saveError && /*#__PURE__*/React.createElement("div", {
     role: "alert",
     style: { ...styles.feedbackBox, ...styles.feedbackBad }
   }, saveError), !submitted && /*#__PURE__*/React.createElement("button", {

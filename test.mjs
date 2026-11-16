@@ -16,6 +16,7 @@ const attemptAccessMigration = await read("17_assessment_attempt_rpc_access.sql"
 const migration = await read("08_security_and_review_fixes.sql");
 const verification = await read("09_security_verification.sql");
 const pkg = JSON.parse(await read("package.json"));
+const retakeHandler = index.slice(index.indexOf("async function retake()"), index.indexOf("function persistWrittenCache"));
 
 assert(!/\bcorrect\s*:/.test(index), "frontend still contains MCQ answer keys");
 assert(!/\bmodelAnswer\s*:/.test(index), "frontend still contains case-study model answers");
@@ -38,6 +39,12 @@ assert(index.includes('"Processing…"') && index.includes("completionStarted.cu
 assert(index.includes("Scoring written answers:") && index.includes("of ${total}"), "learner status does not show persisted written-answer scoring progress as text");
 assert(index.includes('callRpc("get_assessment_attempt_for_staff"') && index.includes("waitForAssessmentResult"), "completion state cannot be checked or recovered from saved server status");
 assert(attemptAccessMigration.includes("revoke all on function public.get_assessment_attempt_for_staff(uuid, text)") && attemptAccessMigration.includes("from public, anon, authenticated") && attemptAccessMigration.includes("grant execute on function public.get_assessment_attempt_for_staff(uuid, text)") && attemptAccessMigration.includes("to anon, authenticated, service_role"), "attempt-status RPC is not granted narrowly to app roles with server role retained");
+assert(retakeHandler.includes('callRpc("start_assessment_attempt"') && retakeHandler.includes("p_module_id: moduleId") && retakeHandler.includes("setAssessmentAttemptId(data.attempt_id)") && retakeHandler.includes("setStep(quizStartIndex)"), "retake does not create a fresh server attempt and start at the first exam question");
+assert(["setAnswers([])", "setSelectedOptions([])", "setWrittenResponses([])", "setWrittenSubmitted([])", "setWrittenDraftSaved([])"].every(reset => retakeHandler.includes(reset)), "retake does not clear previous MCQ answers, written responses, submitted flags, and drafts");
+assert(retakeHandler.includes("completionStarted.current = false") && retakeHandler.includes("finalResultHandled.current = false") && retakeHandler.includes("pendingAnswerSaves.current = []") && retakeHandler.includes("pendingDraftSaves.current = []"), "retake does not reset assessment submission and marking state");
+assert(retakeHandler.includes('callRpc("save_assessment_resume_step"') && retakeHandler.includes("p_step_index: quizStartIndex"), "retake does not persist the new attempt's first exam position for cross-browser resume");
+assert(retakeHandler.includes("assessmentAttemptIdRef.current = data.attempt_id") && index.includes("assessmentAttemptIdRef.current !== requestedAttemptId"), "status responses from the previous attempt can overwrite a retake");
+assert(index.includes("disabled: submitted") && index.includes("Starting a fresh exam attempt…") && index.includes('"aria-live": "polite"'), "retake does not provide a blank writable response state and accessible startup feedback");
 assert(completionEndpoint.includes('begin_assessment_marking') && completionEndpoint.includes('save_assessment_marking_score'), "completion endpoint does not start durable marking or save each score");
 assert(completionEndpoint.includes('finalize_assessment_marking') && completionEndpoint.includes('pause_assessment_marking'), "completion endpoint does not finalize or safely pause resumable marking");
 assert(markingMigration.includes("marking_lease_expires_at") && markingMigration.includes("marking_last_error"), "assessment marking migration lacks a recovery lease or saved error state");

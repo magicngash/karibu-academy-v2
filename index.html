@@ -2053,7 +2053,6 @@ function ShortAnswerCard({
     return () => window.removeEventListener("pagehide", saveDraftOnPageHide);
   }, []);
   const saving = saveStatus === "saving";
-  const needsServerSave = Boolean(draft.trim()) && !submitted && ["", "pending"].includes(draftSaveStatus);
   React.useEffect(() => {
     setDraft(answer || "");
   }, [answer, data.q]);
@@ -2117,19 +2116,13 @@ function ShortAnswerCard({
     placeholder: "Type your answer here...",
     "aria-label": "Short answer",
     style: styles.shortAnswerInput
-  }), needsServerSave && /*#__PURE__*/React.createElement("p", {
-    role: "status",
+  }), /*#__PURE__*/React.createElement("p", {
     style: styles.shortAnswerHint
-  }, "Your draft is being saved to your account. Press Save response before continuing."), draftSaveStatus === "saving" && /*#__PURE__*/React.createElement("p", {
+  }, "Your draft autosaves as you type. Press Save response to submit it."), /*#__PURE__*/React.createElement("span", {
     role: "status",
-    style: styles.shortAnswerHint
-  }, "Saving draft to your account…"), draftSaveStatus === "saved" && !submitted && /*#__PURE__*/React.createElement("p", {
-    role: "status",
-    style: styles.shortAnswerHint
-  }, "Draft saved to your account. Press Save response before continuing."), draftSaveStatus === "cleared" && /*#__PURE__*/React.createElement("p", {
-    role: "status",
-    style: styles.shortAnswerHint
-  }, "Draft cleared from your account."), draftSaveError && /*#__PURE__*/React.createElement("div", {
+    "aria-live": "polite",
+    style: { position: "absolute", width: "1px", height: "1px", margin: "-1px", padding: 0, overflow: "hidden", clip: "rect(0, 0, 0, 0)", whiteSpace: "nowrap", border: 0 }
+  }, draftSaveStatus === "saving" ? "Saving draft to your account…" : draftSaveStatus === "saved" ? "Draft saved to your account." : draftSaveStatus === "cleared" ? "Draft cleared from your account." : ""), draftSaveError && /*#__PURE__*/React.createElement("div", {
     role: "alert",
     style: { ...styles.feedbackBox, ...styles.feedbackBad }
   }, draftSaveError), saveError && /*#__PURE__*/React.createElement("div", {

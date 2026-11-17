@@ -20,6 +20,7 @@ const migration = await read("08_security_and_review_fixes.sql");
 const verification = await read("09_security_verification.sql");
 const pkg = JSON.parse(await read("package.json"));
 const retakeHandler = index.slice(index.indexOf("async function retake()"), index.indexOf("function persistWrittenCache"));
+const writtenDraftSaveHandler = index.slice(index.indexOf("async function saveWrittenDraft("), index.indexOf("async function submitShortAnswer("));
 const resumeTrainingHandler = index.slice(index.indexOf("async function handleResumeTraining()"), index.indexOf("async function retryResumeLookup"));
 const blankRetakeHelper = index.slice(index.indexOf("function isBlankUnstartedRetake(resume)"), index.indexOf("function getResumeLocationLabel(resume)"));
 
@@ -32,6 +33,8 @@ assert(index.includes('role: "alert"') && index.includes("Retry save"), "written
 assert(index.includes("Your draft autosaves as you type. Press Save response to submit it.") && index.includes('callRpc("save_assessment_written_draft"'), "written-answer draft autosave is not explained");
 assert(index.includes("await onDraftSave(value);") && index.includes("current.onDraftSave(current.draft, { keepalive: true })") && !index.includes("onDraftSave(value.trim())") && !index.includes("current.onDraftSave(current.draft.trim()"), "written-answer autosave trims whitespace before saving and can join words when a learner pauses");
 assert(index.includes('"aria-live": "polite"') && index.includes('position: "absolute"') && !index.includes("Your draft is being saved to your account.") && !index.includes("Draft saved to your account. Press Save response before continuing."), "normal autosave status messages still pop up visually while typing");
+assert(index.includes("const writtenResponsesRef = React.useRef(restoredWrittenResponses)") && index.includes("writtenResponsesRef.current = nextResponses") && !index.includes('setDraft(answer || "")'), "active written-answer input is resynced from parent state and can lose in-progress typing");
+assert(writtenDraftSaveHandler.includes("writtenResponsesRef.current[shortIndex] === response") && !writtenDraftSaveHandler.includes("setWrittenResponses(") && !writtenDraftSaveHandler.includes("persistWrittenCache("), "a stale autosave response can overwrite newer written text or local cache");
 assert(whitespaceMigration.includes("security definer") && whitespaceMigration.includes("for update") && whitespaceMigration.includes("values(p_attempt_id,p_question_index,p_answer,now())") && whitespaceMigration.includes("length(btrim(coalesce(p_answer,'')))=0"), "the database draft saver does not preserve meaningful whitespace while validating and clearing blank drafts");
 assert(index.includes('window.addEventListener("pagehide", saveDraftOnPageHide)') && index.includes("keepalive: true"), "the latest written draft is not flushed when the learner leaves the page");
 assert(index.includes('callRpc("get_latest_training_resume"') && index.includes("getResumeLocationLabel") && index.includes('"Resume Training"'), "signed-in landing does not offer a server-backed resume action");

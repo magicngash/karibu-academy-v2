@@ -1200,6 +1200,7 @@ function ModuleFlow({
   const pendingAnswerSaves = React.useRef([]);
   const pendingDraftSaves = React.useRef([]);
   const [writtenResponses, setWrittenResponses] = React.useState(() => restoredWrittenResponses);
+  const writtenResponsesRef = React.useRef(restoredWrittenResponses);
   const [writtenSubmitted, setWrittenSubmitted] = React.useState(() => restoredWrittenSubmitted);
   const [writtenDraftSaved, setWrittenDraftSaved] = React.useState(() => restoredDraftSaved);
   const [writtenSaveStatus, setWrittenSaveStatus] = React.useState("");
@@ -1512,6 +1513,7 @@ function ModuleFlow({
       setSelected(null);
       setAnswers([]);
       setSelectedOptions([]);
+      writtenResponsesRef.current = [];
       setWrittenResponses([]);
       setWrittenSubmitted([]);
       setWrittenDraftSaved([]);
@@ -1548,6 +1550,7 @@ function ModuleFlow({
     nextSubmitted[shortIndex] = false;
     const nextDraftSaved = [...writtenDraftSaved];
     nextDraftSaved[shortIndex] = false;
+    writtenResponsesRef.current = nextResponses;
     setWrittenResponses(nextResponses);
     setWrittenSubmitted(nextSubmitted);
     setWrittenDraftSaved(nextDraftSaved);
@@ -1562,16 +1565,13 @@ function ModuleFlow({
         p_answer: response
       }, fetchOptions);
       if (result.error || !result.data?.success) return false;
-      const nextResponses = [...writtenResponses];
-      nextResponses[shortIndex] = response;
-      const nextSubmitted = [...writtenSubmitted];
-      nextSubmitted[shortIndex] = false;
-      const nextDraftSaved = [...writtenDraftSaved];
-      nextDraftSaved[shortIndex] = Boolean(response.trim());
-      setWrittenResponses(nextResponses);
-      setWrittenSubmitted(nextSubmitted);
-      setWrittenDraftSaved(nextDraftSaved);
-      persistWrittenCache(nextResponses, nextSubmitted, nextDraftSaved);
+      if (writtenResponsesRef.current[shortIndex] === response) {
+        setWrittenDraftSaved(current => {
+          const nextDraftSaved = [...current];
+          nextDraftSaved[shortIndex] = Boolean(response.trim());
+          return nextDraftSaved;
+        });
+      }
       return true;
     })();
     pendingDraftSaves.current.push(pending);
@@ -1603,6 +1603,7 @@ function ModuleFlow({
     nextWrittenSubmitted[shortIndex] = true;
     const nextWrittenDraftSaved = [...writtenDraftSaved];
     nextWrittenDraftSaved[shortIndex] = false;
+    writtenResponsesRef.current = nextWrittenResponses;
     setWrittenResponses(nextWrittenResponses);
     setWrittenSubmitted(nextWrittenSubmitted);
     setWrittenDraftSaved(nextWrittenDraftSaved);
@@ -2053,9 +2054,9 @@ function ShortAnswerCard({
     return () => window.removeEventListener("pagehide", saveDraftOnPageHide);
   }, []);
   const saving = saveStatus === "saving";
-  React.useEffect(() => {
-    setDraft(answer || "");
-  }, [answer, data.q]);
+  // This component is keyed by quiz index and starts from the restored answer.
+  // Do not mirror later parent updates: an in-flight autosave may be older than
+  // text the learner has continued typing in this controlled textarea.
   function queueDraftSave(value, immediate = false) {
     if (draftTimer.current) clearTimeout(draftTimer.current);
     if (submitted || (!value.trim() && !serverDraftExists.current)) return;

@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0" />
-<title>Karibu Academy — Waiter Training</title>
+<title>Training</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
 <script src="/runtime-config.js"></script>
@@ -28,11 +28,14 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 const SUPABASE_URL = window.KARIBU_SUPABASE_URL || "https://YOUR-V2-PROJECT.supabase.co";
 const SUPABASE_ANON_KEY = window.KARIBU_SUPABASE_ANON_KEY || "YOUR_V2_PUBLISHABLE_OR_ANON_KEY";
 const AUTH_TOKEN_KEY = "karibu-v2-auth-token";
+const COURSE_GUIDE_VERSION = "service-training-guide-v1";
+const COURSE_GUIDE_URL = "/course-guide.pdf";
 // Supported links: /training?r=<id> (legacy) or /<restaurant-slug> (preferred).
 const routeParams = new URLSearchParams(window.location.search);
 const routeParts = window.location.pathname.split("/").filter(Boolean);
 const ROUTE_SLUG = routeParts.length === 1 && !["training", "index.html", "console"].includes(routeParts[0]) ? routeParts[0].toLowerCase() : "";
 let RESTAURANT_ID = routeParams.get("r") || "";
+let RESTAURANT_BRANDING = null;
 let RESTAURANT_ROUTE_ERROR = "";
 
 // Plain fetch-based RPC helper — no external SDK/script tag required,
@@ -2285,117 +2288,11 @@ function ComingSoon({
 // =====================================================================
 // HOME DASHBOARD
 // =====================================================================
-// =====================================================================
-// WELCOME / ONBOARDING (shown once, swipeable cards, before the dashboard)
-// =====================================================================
-function getOnboarding(restaurantName) {
-  return [{
-    icon: "hand",
-    eyebrow: "WELCOME",
-    title: `Welcome to ${restaurantName} Training App`,
-    paragraph: "We're delighted to have you on the team. This app will help you build the skills and confidence to deliver excellent service, every shift. Whether you're brand new or you've been here for years, this training is for you."
-  }, {
-    icon: "star",
-    eyebrow: "OUR PURPOSE",
-    title: "Why This Training Exists",
-    paragraph: "This course exists to help you:",
-    bullets: [`Learn ${restaurantName}'s service standards`, "Understand your responsibilities on the floor", "Build confidence handling real guest situations", "Turn everyday service into something guests remember"]
-  }, {
-    icon: "book",
-    eyebrow: "WHAT YOU'LL LEARN",
-    title: "Ten Modules, One Standard",
-    numbered: true,
-    bullets: ["Warm Welcomes, First Impressions, and Service Presence", "Menu, Product, and Service Knowledge", "Strategic Upselling Techniques", "Precision Order-Taking, Service Delivery, and Coordination", "Shift Management, Billing, and Guest Flow", "Conflict Resolution and Service Recovery", "Communication Skills for Customer Care", "Emotional Intelligence and Customer Psychology", "Teamwork, Accountability, and Shift Culture", "Service Standards, Professionalism, and Quality Control"],
-    footnote: "Each module includes short lessons, real scenarios, and a quiz at the end."
-  }, {
-    icon: "check",
-    eyebrow: "OUR VALUES",
-    title: "What We Value",
-    bullets: ["Warmth — every guest is noticed and made to feel welcome.", "Attentiveness — guests are remembered, not treated as an afterthought.", "Honesty — when something goes wrong, we own it and fix it.", "Teamwork — we look out for each other, especially under pressure."]
-  }, {
-    icon: "clipboard",
-    eyebrow: "HOW IT WORKS",
-    title: "Your Learning Journey",
-    numbered: true,
-    bullets: ["Read each lesson at your own pace.", "Complete the short quiz at the end.", "Earn a badge for finishing the module.", "Move on to the next module whenever you're ready."],
-    footnote: "The goal isn't just to pass the quiz — it's to feel confident on the floor."
-  }, {
-    icon: "shield",
-    eyebrow: "YOUR RESPONSIBILITY",
-    title: "What's Expected of You",
-    bullets: ["Complete all 10 modules at your own pace.", "Answer quizzes honestly — they're for you, not against you.", "Apply what you learn during real shifts.", "Ask questions whenever you need clarification.", "Your manager can see which modules you've completed."]
-  }, {
-    icon: "badge",
-    eyebrow: "OUR PROMISE",
-    title: "Our Service Promise",
-    paragraph: `At ${restaurantName}, we believe every guest deserves:`,
-    bullets: ["A warm welcome, every time.", "Friendly, respectful, and prompt service.", "Accurate orders and clean surroundings.", "Problems handled honestly and quickly.", "A dining experience they remember."]
-  }, {
-    icon: "eye",
-    eyebrow: "BEFORE YOU START",
-    title: "Tips & Support",
-    bullets: ["Find a quiet moment, free of distractions.", "Go through one module at a time.", "Retake any quiz you find tricky — there's no penalty.", "Technical issues or questions? Speak to your supervisor."]
-  }];
-}
-function OnboardingCard({
-  step
-}) {
-  return /*#__PURE__*/React.createElement("div", {
-    style: styles.cardWrap
-  }, /*#__PURE__*/React.createElement("div", {
-    style: styles.iconCircle
-  }, /*#__PURE__*/React.createElement(Icon, {
-    name: step.icon,
-    className: "icon-lg"
-  })), /*#__PURE__*/React.createElement("span", {
-    style: styles.eyebrowLight
-  }, step.eyebrow), /*#__PURE__*/React.createElement("h2", {
-    style: styles.cardTitle
-  }, step.title), step.paragraph && /*#__PURE__*/React.createElement("p", {
-    style: styles.bodyText
-  }, step.paragraph), step.bullets && /*#__PURE__*/React.createElement("ul", {
-    style: styles.objList
-  }, step.bullets.map((b, i) => /*#__PURE__*/React.createElement("li", {
-    key: i,
-    style: styles.objItem
-  }, step.numbered ? /*#__PURE__*/React.createElement("span", {
-    style: styles.syllabusIndex
-  }, i + 1) : /*#__PURE__*/React.createElement(Icon, {
-    name: "check",
-    className: "icon-sm"
-  }), /*#__PURE__*/React.createElement("span", {
-    style: styles.bodyText
-  }, b)))), step.footnote && /*#__PURE__*/React.createElement("p", {
-    style: {
-      ...styles.bodyText,
-      ...styles.exampleBox
-    }
-  }, step.footnote));
-}
-function ReadyToStart({
-  onStart,
-  restaurantName
-}) {
-  return /*#__PURE__*/React.createElement("div", {
-    style: styles.completeWrap
-  }, /*#__PURE__*/React.createElement("div", {
-    style: styles.badgeCircle
-  }, /*#__PURE__*/React.createElement(Icon, {
-    name: "badge",
-    className: "icon-xl"
-  })), /*#__PURE__*/React.createElement("span", {
-    style: styles.eyebrowLight
-  }, "READY TO BEGIN?"), /*#__PURE__*/React.createElement("h1", {
-    style: styles.coverTitle
-  }, "Let's Get Started"), /*#__PURE__*/React.createElement("p", {
-    style: styles.coverSub
-  }, "We're excited to be part of your learning journey. Together, we'll build the skills, confidence, and professionalism that define outstanding service at ", restaurantName, " — one module at a time."), /*#__PURE__*/React.createElement("button", {
-    style: styles.primaryBtn,
-    onClick: onStart
-  }, "Continue to training ", /*#__PURE__*/React.createElement(Icon, {
-    name: "arrow",
-    className: "icon-sm"
-  })));
+function getBrandingLabel(branding) {
+  return [branding?.app_name, branding?.name]
+    .map(value => String(value || "").trim())
+    .filter(Boolean)
+    .join(" · ");
 }
 
 // =====================================================================
@@ -2470,7 +2367,7 @@ function Login({
     className: "icon-lg"
   })), /*#__PURE__*/React.createElement("span", {
     style: styles.eyebrowLight
-  }, (branding.name || "RESTAURANT").toUpperCase()), /*#__PURE__*/React.createElement("h1", {
+  }, (getBrandingLabel(branding).toUpperCase() || "TRAINING")), /*#__PURE__*/React.createElement("h1", {
     style: styles.coverTitle
   }, "Staff Sign In"), /*#__PURE__*/React.createElement("p", {
     style: styles.coverSub
@@ -2545,6 +2442,69 @@ function getResumeLocationLabel(resume) {
   const question = Math.min(step - quizStart + 1, (data.quiz || []).length);
   return `${data.topBarLabel || `Module ${moduleId}`} · Assessment question ${Math.max(1, question)} of ${(data.quiz || []).length}`;
 }
+function CourseGuideGate({
+  status,
+  error,
+  onRetry,
+  onAcknowledge
+}) {
+  const [guideOpened, setGuideOpened] = React.useState(false);
+  const [guideConfirmed, setGuideConfirmed] = React.useState(false);
+  const busy = status === "checking" || status === "saving";
+  return /*#__PURE__*/React.createElement("section", {
+    "aria-labelledby": "course-guide-gate-title",
+    style: { ...styles.feedbackBox, textAlign: "left", marginTop: 18, background: "#fffdf9", border: `2px solid ${COLORS.marigoldDark}` }
+  }, /*#__PURE__*/React.createElement("h2", {
+    id: "course-guide-gate-title",
+    style: { ...styles.feedbackHeading, fontSize: "1.15rem", marginBottom: 8 }
+  }, "Please read the following instructions before proceeding"), /*#__PURE__*/React.createElement("p", {
+    style: { ...styles.feedbackText, marginTop: 0 }
+  }, "Open the Course Guide to review how the modules, assessments, written answers, and saved progress work."), /*#__PURE__*/React.createElement("a", {
+    href: COURSE_GUIDE_URL,
+    target: "_blank",
+    rel: "noopener noreferrer",
+    onClick: () => setGuideOpened(true),
+    style: { ...styles.secondaryBtn, display: "inline-flex", justifyContent: "center", alignItems: "center", textDecoration: "none", margin: "4px 0 14px", width: "100%" }
+  }, "Open the Course Guide (PDF)"), status === "checking" && /*#__PURE__*/React.createElement("p", {
+    "aria-live": "polite",
+    style: styles.feedbackText
+  }, "Checking whether your acknowledgement is already saved to your account…"), status === "saving" && /*#__PURE__*/React.createElement("p", {
+    "aria-live": "polite",
+    style: styles.feedbackText
+  }, "Saving your acknowledgement… Please wait."), status === "error" && /*#__PURE__*/React.createElement("div", {
+    role: "alert",
+    style: { ...styles.feedbackBox, ...styles.errorBox, marginTop: 8 }
+  }, /*#__PURE__*/React.createElement("p", {
+    style: styles.feedbackText
+  }, error || "We couldn't verify your Course Guide acknowledgement. Please check your connection and try again."), /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    style: styles.secondaryBtn,
+    onClick: onRetry
+  }, "Check again")), status === "required" && error && /*#__PURE__*/React.createElement("div", {
+    role: "alert",
+    style: { ...styles.feedbackBox, ...styles.errorBox, marginTop: 8 }
+  }, /*#__PURE__*/React.createElement("p", {
+    style: styles.feedbackText
+  }, error)), status === "required" && /*#__PURE__*/React.createElement("label", {
+    htmlFor: "course-guide-confirmation",
+    style: { display: "flex", alignItems: "flex-start", gap: 10, margin: "8px 0 14px", color: COLORS.espresso, fontSize: "0.92rem", lineHeight: 1.5 }
+  }, /*#__PURE__*/React.createElement("input", {
+    id: "course-guide-confirmation",
+    type: "checkbox",
+    checked: guideConfirmed,
+    disabled: !guideOpened || busy,
+    onChange: event => setGuideConfirmed(event.target.checked),
+    style: { width: 20, height: 20, marginTop: 2, accentColor: COLORS.marigoldDark, flexShrink: 0 }
+  }), /*#__PURE__*/React.createElement("span", null, "I have read and understand the Course Guide.")), status === "required" && /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    style: { ...styles.primaryBtn, width: "100%" },
+    disabled: !guideOpened || !guideConfirmed || busy,
+    onClick: onAcknowledge
+  }, "I’ve read the guide — continue ", /*#__PURE__*/React.createElement(Icon, {
+    name: "arrow",
+    className: "icon-sm"
+  })));
+}
 function SignedInLanding({
   branding,
   session,
@@ -2553,14 +2513,21 @@ function SignedInLanding({
   resumeTraining,
   resumeLookupError,
   onRetryResume,
-  onResume
+  onResume,
+  courseGuideStatus,
+  courseGuideError,
+  onRetryCourseGuide,
+  onAcknowledgeCourseGuide
 }) {
   const isManager = session.role === "manager";
+  const guideAcknowledged = courseGuideStatus === "acknowledged";
   const resumeAttempt = resumeTraining?.attempt || {};
   const resumeModuleId = Number(resumeAttempt.module_id || resumeTraining?.moduleId);
   const resumeModule = MODULES.find(module => module.id === resumeModuleId);
   const resumeTitle = resumeModule?.title || resumeModule?.name || MODULE_DATA[resumeModuleId]?.topBarLabel || `Module ${resumeModuleId}`;
   const resumeLocation = getResumeLocationLabel(resumeTraining);
+  const restaurantName = String(branding?.name || "your restaurant").trim();
+  const appName = String(branding?.app_name || "your training app").trim();
   return /*#__PURE__*/React.createElement("div", {
     className: "screen",
     style: styles.screen
@@ -2573,134 +2540,75 @@ function SignedInLanding({
     className: "icon-xl"
   })), /*#__PURE__*/React.createElement("span", {
     style: styles.eyebrowLight
-  }, (branding.name || "RESTAURANT").toUpperCase()), /*#__PURE__*/React.createElement("h1", {
+  }, getBrandingLabel(branding).toUpperCase() || "TRAINING"), guideAcknowledged ? /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("h1", {
     style: styles.coverTitle
   }, "Welcome, ", session.fullName.split(" ")[0]), /*#__PURE__*/React.createElement("p", {
     style: styles.coverSub
-  }, "You're signed in as ", /*#__PURE__*/React.createElement("strong", null, session.fullName), isManager ? " (Manager)" : "", "."), isManager && session.paymentStatus === "overdue" && /*#__PURE__*/React.createElement("div", {
-    style: {
-      ...styles.feedbackBox,
-      ...styles.errorBox,
-      textAlign: "left",
-      marginTop: 4
-    }
+  }, "You're signed in as ", /*#__PURE__*/React.createElement("strong", null, session.fullName), isManager ? " (Manager)" : "", `. Training at ${restaurantName} with ${appName}.`), isManager && session.paymentStatus === "overdue" && /*#__PURE__*/React.createElement("div", {
+    style: { ...styles.feedbackBox, ...styles.errorBox, textAlign: "left", marginTop: 4 }
   }, /*#__PURE__*/React.createElement("span", {
     style: styles.feedbackHeading
   }, "Payment overdue"), /*#__PURE__*/React.createElement("p", {
     style: styles.feedbackText
-  }, "This restaurant's Karibu Academy subscription has an overdue payment. Staff can still train for now, but please settle the invoice to avoid account suspension.")), resumeLookupError && /*#__PURE__*/React.createElement("div", { role: "alert", style: { ...styles.feedbackBox, ...styles.feedbackBad, textAlign: "left", marginTop: 12 } }, /*#__PURE__*/React.createElement("p", { style: styles.feedbackText }, resumeLookupError), /*#__PURE__*/React.createElement("button", { type: "button", style: styles.secondaryBtn, onClick: onRetryResume }, "Check again")), resumeTraining && /*#__PURE__*/React.createElement("section", {
+  }, `This restaurant's ${appName} subscription has an overdue payment. Staff can still train for now, but please settle the invoice to avoid account suspension.`)), resumeLookupError && /*#__PURE__*/React.createElement("div", {
+    role: "alert",
+    style: { ...styles.feedbackBox, ...styles.feedbackBad, textAlign: "left", marginTop: 12 }
+  }, /*#__PURE__*/React.createElement("p", {
+    style: styles.feedbackText
+  }, resumeLookupError), /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    style: styles.secondaryBtn,
+    onClick: onRetryResume
+  }, "Check again")), /*#__PURE__*/React.createElement("a", {
+    href: COURSE_GUIDE_URL,
+    target: "_blank",
+    rel: "noopener noreferrer",
+    style: { ...styles.secondaryBtn, display: "inline-flex", justifyContent: "center", alignItems: "center", textDecoration: "none", width: "100%", marginTop: 14 }
+  }, "Open the Course Guide (PDF)"), resumeTraining && /*#__PURE__*/React.createElement("section", {
     "aria-labelledby": "resume-training-title",
     style: { ...styles.feedbackBox, textAlign: "left", marginTop: 16, border: `2px solid ${COLORS.marigoldDark}`, background: "#fffdf9", boxShadow: "0 8px 20px rgba(49, 40, 31, 0.12)" }
-  }, /*#__PURE__*/React.createElement("h2", { id: "resume-training-title", style: { ...styles.feedbackHeading, fontSize: "1.15rem", marginBottom: 6 } }, "Resume Training"), /*#__PURE__*/React.createElement("p", { style: { ...styles.feedbackText, marginTop: 0 } }, "Pick up where you left off: ", resumeTitle, ". ", resumeLocation, "."), /*#__PURE__*/React.createElement("button", { type: "button", style: { ...styles.primaryBtn, width: "100%", marginTop: 10 }, onClick: onResume }, "Resume Training ", /*#__PURE__*/React.createElement(Icon, { name: "arrow", className: "icon-sm" }))), isManager ? /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("button", {
-    style: {
-      ...styles.primaryBtn,
-      marginTop: 18
-    },
+  }, /*#__PURE__*/React.createElement("h2", {
+    id: "resume-training-title",
+    style: { ...styles.feedbackHeading, fontSize: "1.15rem", marginBottom: 6 }
+  }, "Resume Training"), /*#__PURE__*/React.createElement("p", {
+    style: { ...styles.feedbackText, marginTop: 0 }
+  }, "Pick up where you left off: ", resumeTitle, ". ", resumeLocation, "."), /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    style: { ...styles.primaryBtn, width: "100%", marginTop: 10 },
+    onClick: onResume
+  }, "Resume Training ", /*#__PURE__*/React.createElement(Icon, {
+    name: "arrow",
+    className: "icon-sm"
+  }))), isManager ? /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    style: { ...styles.primaryBtn, marginTop: 18 },
     onClick: onManagerDashboard
   }, "Open Manager Dashboard ", /*#__PURE__*/React.createElement(Icon, {
     name: "arrow",
     className: "icon-sm"
   })), /*#__PURE__*/React.createElement("button", {
-    style: {
-      background: "none",
-      border: "none",
-      color: COLORS.stone,
-      fontSize: "0.85rem",
-      marginTop: 14,
-      cursor: "pointer"
-    },
+    type: "button",
+    style: { background: "none", border: "none", color: COLORS.stone, fontSize: "0.85rem", marginTop: 14, cursor: "pointer" },
     onClick: onContinue
   }, "Or continue to staff training →")) : /*#__PURE__*/React.createElement("button", {
-    style: {
-      ...styles.primaryBtn,
-      marginTop: 18
-    },
+    type: "button",
+    style: { ...styles.primaryBtn, marginTop: 18 },
     onClick: onContinue
   }, "Continue ", /*#__PURE__*/React.createElement(Icon, {
     name: "arrow",
     className: "icon-sm"
+  }))) : /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("h1", {
+    style: styles.coverTitle
+  }, `Welcome to ${restaurantName} Training`), /*#__PURE__*/React.createElement("p", {
+    style: styles.coverSub
+  }, `The ${appName} course will help you build practical skills and confidence to deliver excellent service, every shift.`), /*#__PURE__*/React.createElement(CourseGuideGate, {
+    status: courseGuideStatus,
+    error: courseGuideError,
+    onRetry: onRetryCourseGuide,
+    onAcknowledge: onAcknowledgeCourseGuide
   }))));
 }
-function Welcome({
-  restaurantName,
-  onStart,
-  onBack,
-  resumeKey
-}) {
-  const [step, setStep] = React.useState(() => {
-    try {
-      return JSON.parse(localStorage.getItem(resumeKey) || "null")?.step || 0;
-    } catch (_) {
-      return 0;
-    }
-  });
-  const onboardingScreenRef = React.useRef(null);
-  const onboarding = getOnboarding(restaurantName);
-  const isCTA = step === onboarding.length;
-  React.useEffect(() => {
-    if (onboardingScreenRef.current) onboardingScreenRef.current.scrollTop = 0;
-  }, [step]);
-  React.useEffect(() => {
-    if (resumeKey) localStorage.setItem(resumeKey, JSON.stringify({ step, updatedAt: Date.now() }));
-  }, [resumeKey, step]);
-  function next() {
-    setStep(s => Math.min(s + 1, onboarding.length));
-  }
-  return /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
-    style: styles.topBar
-  }, /*#__PURE__*/React.createElement("button", {
-    style: styles.backBtn,
-    onClick: onBack,
-    "aria-label": "Back to signed-in landing"
-  }, /*#__PURE__*/React.createElement(Icon, {
-    name: "back",
-    className: "icon-sm"
-  })), /*#__PURE__*/React.createElement("div", {
-    style: {
-      flex: 1
-    }
-  }, /*#__PURE__*/React.createElement("div", {
-    style: styles.progressTrack
-  }, /*#__PURE__*/React.createElement("div", {
-    style: {
-      ...styles.progressFill,
-      width: `${Math.min(step, onboarding.length) / onboarding.length * 100}%`
-    }
-  })))), /*#__PURE__*/React.createElement("div", {
-    className: "screen",
-    ref: onboardingScreenRef,
-    style: styles.screen
-  }, !isCTA && /*#__PURE__*/React.createElement(OnboardingCard, {
-    step: onboarding[step]
-  }), isCTA && /*#__PURE__*/React.createElement(ReadyToStart, {
-    onStart: onStart,
-    restaurantName: restaurantName
-  }), !isCTA && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
-    style: styles.dots
-  }, onboarding.map((_, i) => /*#__PURE__*/React.createElement("span", {
-    key: i,
-    style: {
-      ...styles.dot,
-      ...(i === step ? styles.dotActive : {})
-    }
-  }))), /*#__PURE__*/React.createElement("button", {
-    style: {
-      ...styles.primaryBtn,
-      position: "sticky",
-      bottom: 0,
-      zIndex: 2,
-      marginTop: 18
-    },
-    onClick: next
-  }, step === onboarding.length - 1 ? "Continue" : "Next", " ", /*#__PURE__*/React.createElement(Icon, {
-    name: "arrow",
-    className: "icon-sm"
-  })))));
-}
 
-// =====================================================================
-// MANAGER DASHBOARD
-// =====================================================================
 function ManagerDashboard({
   onExit
 }) {
@@ -3116,110 +3024,118 @@ function Home({
   onLogout
 }) {
   const doneCount = completedIds.length;
-  return /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
-    className: "home-header",
-    style: styles.homeHeader
-  }, /*#__PURE__*/React.createElement("div", {
-    style: {
-      display: "flex",
-      justifyContent: "space-between",
-      alignItems: "flex-start"
-    }
-  }, /*#__PURE__*/React.createElement("button", {
-    onClick: onBackToLanding,
-    "aria-label": "Back to signed-in landing",
-    style: {
-      display: "flex",
-      alignItems: "center",
-      gap: 6,
-      background: "none",
-      border: "none",
-      color: COLORS.marigold,
-      cursor: "pointer",
-      padding: 0
-    }
-  }, /*#__PURE__*/React.createElement(Icon, {
-    name: "back",
-    className: "icon-sm"
-  }), /*#__PURE__*/React.createElement("span", {
-    style: styles.eyebrowDark
-  }, "Back · ", (branding.app_name || "KARIBU ACADEMY").toUpperCase())), /*#__PURE__*/React.createElement("button", {
-    onClick: onManagerDashboard,
-    style: session?.role === "manager" ? styles.courseDashboardBtn : { display: "none" },
-    type: "button"
-  }, "Manager dashboard"), /*#__PURE__*/React.createElement("button", {
-    onClick: onLogout,
-    style: {
-      background: "none",
-      border: "none",
-      color: COLORS.tan,
-      fontSize: "0.75rem",
-      cursor: "pointer",
-      padding: 0
-    }
-  }, "Sign out")), /*#__PURE__*/React.createElement("h1", {
-    style: {
-      ...styles.coverTitle,
-      fontSize: "1.7rem"
-    }
-  }, "Waiter Training"), /*#__PURE__*/React.createElement("p", {
-    style: {
-      ...styles.coverSub,
-      marginBottom: 4
-    }
-  }, session?.fullName ? `Welcome back, ${session.fullName.split(" ")[0]}. ` : "", "Ten short modules to help you serve every guest with confidence."), /*#__PURE__*/React.createElement("div", {
-    style: styles.overallRow
-  }, /*#__PURE__*/React.createElement("div", {
-    style: styles.progressTrack
-  }, /*#__PURE__*/React.createElement("div", {
-    style: {
-      ...styles.progressFill,
-      width: `${doneCount / MODULES.length * 100}%`
-    }
-  })), /*#__PURE__*/React.createElement("span", {
-    style: styles.overallLabel
-  }, doneCount, " of ", MODULES.length, " complete"))), /*#__PURE__*/React.createElement("div", {
-    className: "screen",
-    style: styles.screen
-  }, /*#__PURE__*/React.createElement("div", {
-    className: "module-list",
-    style: styles.moduleList
-  }, MODULES.map(m => {
-    const isDone = completedIds.includes(m.id);
-    const isUnlocked = !isDone && (m.id === 1 || completedIds.includes(m.id - 1));
-    const resumeKey = `karibu-training:${RESTAURANT_ID}:${session?.staffId}:module:${m.id}`;
+  const moduleCards = MODULES.map(module => {
+    const isDone = completedIds.includes(module.id);
+    const isUnlocked = !isDone && (module.id === 1 || completedIds.includes(module.id - 1));
+    const resumeKey = `karibu-training:${RESTAURANT_ID}:${session?.staffId}:module:${module.id}`;
     const hasResume = !isDone && Boolean(localStorage.getItem(resumeKey));
-    return /*#__PURE__*/React.createElement("button", {
-      key: m.id,
+    return React.createElement("button", {
+      key: module.id,
       className: "module-card",
       style: styles.moduleCard,
-      onClick: () => isUnlocked && onSelect(m),
+      onClick: () => isUnlocked && onSelect(module),
       disabled: !isUnlocked,
-      "aria-label": isUnlocked ? `Open module ${m.id}` : `Module ${m.id} locked`
-    }, /*#__PURE__*/React.createElement("div", {
+      "aria-label": isUnlocked ? `Open module ${module.id}` : `Module ${module.id} locked`
+    }, React.createElement("div", {
       style: {
         ...styles.moduleIconWrap,
         background: isDone ? COLORS.avocado : isUnlocked ? COLORS.espresso : "#E3D8C5",
         color: isDone || isUnlocked ? COLORS.marigold : COLORS.stone
       }
-    }, /*#__PURE__*/React.createElement(Icon, {
-      name: isDone ? "check" : isUnlocked ? m.icon : "lock",
+    }, React.createElement(Icon, {
+      name: isDone ? "check" : isUnlocked ? module.icon : "lock",
       className: "icon-md"
-    })), /*#__PURE__*/React.createElement("div", {
+    })), React.createElement("div", {
       style: styles.moduleCardBody
-    }, /*#__PURE__*/React.createElement("span", {
+    }, React.createElement("span", {
       style: styles.moduleCardNum
-    }, "MODULE ", m.id), /*#__PURE__*/React.createElement("span", {
+    }, "MODULE ", module.id), React.createElement("span", {
       style: styles.moduleCardTitle
-    }, m.title), /*#__PURE__*/React.createElement("span", {
+    }, module.title), React.createElement("span", {
       style: styles.moduleCardBlurb
-    }, m.blurb)), /*#__PURE__*/React.createElement("span", {
+    }, module.blurb)), React.createElement("span", {
       style: {
         ...styles.statusPill,
         ...(isDone ? styles.pillDone : isUnlocked ? styles.pillGo : styles.pillSoon)
       }
     }, isDone ? "Done" : isUnlocked ? hasResume ? "Resume" : "Start" : "Locked"));
-  }))));
+  });
+  return React.createElement(React.Fragment, null,
+    React.createElement("div", {
+      className: "home-header",
+      style: styles.homeHeader
+    }, React.createElement("div", {
+      style: {
+        display: "flex",
+        justifyContent: "space-between",
+        alignItems: "flex-start"
+      }
+    }, React.createElement("button", {
+      onClick: onBackToLanding,
+      "aria-label": "Back to signed-in landing",
+      style: {
+        display: "flex",
+        alignItems: "center",
+        gap: 6,
+        background: "none",
+        border: "none",
+        color: COLORS.marigold,
+        cursor: "pointer",
+        padding: 0
+      }
+    }, React.createElement(Icon, {
+      name: "back",
+      className: "icon-sm"
+    }), React.createElement("span", {
+      style: styles.eyebrowDark
+    }, "Back · ", getBrandingLabel(branding).toUpperCase() || "TRAINING")), React.createElement("button", {
+      onClick: onManagerDashboard,
+      style: session?.role === "manager" ? styles.courseDashboardBtn : { display: "none" },
+      type: "button"
+    }, "Manager dashboard"), React.createElement("button", {
+      onClick: onLogout,
+      style: {
+        background: "none",
+        border: "none",
+        color: COLORS.tan,
+        fontSize: "0.75rem",
+        cursor: "pointer",
+        padding: 0
+      }
+    }, "Sign out")), React.createElement("h1", {
+      style: {
+        ...styles.coverTitle,
+        fontSize: "1.7rem"
+      }
+    }, branding?.name ? `${branding.name} Training` : "Training"), React.createElement("p", {
+      style: {
+        ...styles.coverSub,
+        marginBottom: 4
+      }
+    }, session?.fullName ? `Welcome back, ${session.fullName.split(" ")[0]}. ` : "", `The ${branding?.app_name || "training"} course includes ten modules to help you serve guests confidently at ${branding?.name || "your restaurant"}.`), React.createElement("a", {
+      href: COURSE_GUIDE_URL,
+      target: "_blank",
+      rel: "noopener noreferrer",
+      style: { ...styles.secondaryBtn, display: "inline-flex", justifyContent: "center", alignItems: "center", textDecoration: "none", marginTop: 10, marginBottom: 6 }
+    }, "Open Course Guide (PDF)"), React.createElement("div", {
+      style: styles.overallRow
+    }, React.createElement("div", {
+      style: styles.progressTrack
+    }, React.createElement("div", {
+      style: {
+        ...styles.progressFill,
+        width: `${doneCount / MODULES.length * 100}%`
+      }
+    })), React.createElement("span", {
+      style: styles.overallLabel
+    }, doneCount, " of ", MODULES.length, " complete"))), React.createElement("div", {
+      className: "screen",
+      style: styles.screen
+    }, React.createElement("div", {
+      className: "module-list",
+      style: styles.moduleList
+    }, moduleCards))
+  );
 }
 
 // =====================================================================
@@ -3249,28 +3165,33 @@ function App() {
       }
     }, "Back to home"));
   }
-  const [screen, setScreen] = React.useState("login"); // 'login' | 'welcome' | 'home' | 'module' | 'coming-soon' | 'manager-dashboard'
+  const [screen, setScreen] = React.useState("login"); // 'login' | 'signed-in' | 'home' | 'module' | 'coming-soon' | 'manager-dashboard'
   const [session, setSession] = React.useState(null); // { staffId, fullName, role }
   const [activeMod, setActiveMod] = React.useState(null);
   const [completedIds, setCompletedIds] = React.useState([]);
   const [resumeTraining, setResumeTraining] = React.useState(null);
   const [resumeLookupError, setResumeLookupError] = React.useState("");
   const [moduleResumeSnapshot, setModuleResumeSnapshot] = React.useState(null);
-  const [branding, setBranding] = React.useState({
-    name: "Restaurant",
-    app_name: "Karibu Academy"
-  });
+  const [courseGuideStatus, setCourseGuideStatus] = React.useState("idle");
+  const [courseGuideError, setCourseGuideError] = React.useState("");
+  const [branding, setBranding] = React.useState(() => RESTAURANT_BRANDING || { name: "", app_name: "" });
   const [sessionId, setSessionId] = React.useState(null); // usage-tracking session, separate from staff login session
 
   React.useEffect(() => {
     callRpc("get_restaurant_info", {
       p_restaurant_id: RESTAURANT_ID
-    }).then(({
-      data
-    }) => {
-      if (data) setBranding(data);
+    }).then(({ data }) => {
+      if (data?.name && data?.app_name) {
+        RESTAURANT_BRANDING = data;
+        setBranding(data);
+      }
     });
   }, []);
+  React.useEffect(() => {
+    const restaurantName = String(branding?.name || "").trim();
+    const appName = String(branding?.app_name || "").trim();
+    if (restaurantName && appName) document.title = `${appName} · ${restaurantName} Training`;
+  }, [branding?.name, branding?.app_name]);
 
   // Heartbeat every 60s while a usage session is active, so "time spent" can
   // be estimated even if someone just closes the tab without signing out.
@@ -3312,8 +3233,39 @@ function App() {
     try { localStorage.setItem(lastPageKey, JSON.stringify({ screen, updatedAt: Date.now() })); } catch (_) {}
   }, [session?.staffId, screen]);
 
+  async function refreshCourseGuideAcknowledgement() {
+    setCourseGuideStatus("checking");
+    setCourseGuideError("");
+    const { data, error } = await callRpc("get_course_guide_acknowledgement", {
+      p_guide_version: COURSE_GUIDE_VERSION
+    });
+    if (error || !data?.success) {
+      setCourseGuideStatus("error");
+      setCourseGuideError("We couldn't verify whether you've read the Course Guide. Please check your connection and try again.");
+      return null;
+    }
+    const acknowledged = data.acknowledged === true;
+    setCourseGuideStatus(acknowledged ? "acknowledged" : "required");
+    return acknowledged;
+  }
+  async function acknowledgeCourseGuide() {
+    if (courseGuideStatus !== "required") return;
+    setCourseGuideStatus("saving");
+    setCourseGuideError("");
+    const { data, error } = await callRpc("acknowledge_course_guide", {
+      p_guide_version: COURSE_GUIDE_VERSION
+    });
+    if (error || !data?.success || data.acknowledged !== true) {
+      setCourseGuideStatus("required");
+      setCourseGuideError("We couldn't save your acknowledgement. Your training has not been unlocked. Please try again.");
+      return;
+    }
+    setCourseGuideStatus("acknowledged");
+  }
   async function handleLoggedIn(newSession) {
     setSession(newSession);
+    setScreen("signed-in");
+    const courseGuideAcknowledged = await refreshCourseGuideAcknowledgement();
     setResumeTraining(null);
     setResumeLookupError("");
     setModuleResumeSnapshot(null);
@@ -3373,11 +3325,12 @@ function App() {
       else if (!latestResume.saved.assessmentAttemptId) resumeCandidate = { attempt: { id: null, module_id: latestResume.moduleId, current_step: latestResume.saved.step || 0, status: "in_progress" }, mcq_answers: [], written_answers: [], written_drafts: [], localSnapshot: latestResume.saved };
     }
     if (resumeCandidate?.attempt) setResumeTraining(resumeCandidate);
-    const onboardingKey = `karibu-training:${RESTAURANT_ID}:${newSession.staffId}:onboarding`;
     const lastPageKey = `karibu-last-page:${RESTAURANT_ID}:${newSession.staffId}`;
     let lastPage = null;
     try { lastPage = JSON.parse(localStorage.getItem(lastPageKey) || "null"); } catch (_) {}
-    if (resumeCandidate?.attempt || resumeLookupFailed) {
+    if (!courseGuideAcknowledged) {
+      setScreen("signed-in");
+    } else if (resumeCandidate?.attempt || resumeLookupFailed) {
       setScreen("signed-in");
     } else if (lastPage?.screen === "home") {
       setScreen("home");
@@ -3386,8 +3339,6 @@ function App() {
     } else if (lastPage?.screen === "module" && MODULE_DATA[lastPage.moduleId] && !remotelyCompleted.includes(Number(lastPage.moduleId)) && !locallyCompleted.includes(Number(lastPage.moduleId))) {
       setActiveMod(MODULES.find(m => m.id === Number(lastPage.moduleId)) || null);
       setScreen("module");
-    } else if (localStorage.getItem(onboardingKey)) {
-      setScreen("welcome");
     } else {
       setScreen("signed-in");
     }
@@ -3456,6 +3407,8 @@ function App() {
     setResumeTraining(null);
     setResumeLookupError("");
     setModuleResumeSnapshot(null);
+    setCourseGuideStatus("idle");
+    setCourseGuideError("");
     setActiveMod(null);
     setScreen("login");
   }
@@ -3510,16 +3463,12 @@ function App() {
     resumeLookupError: resumeLookupError,
     onRetryResume: retryResumeLookup,
     onResume: handleResumeTraining,
-    onContinue: () => setScreen(resumeTraining || resumeLookupError ? "home" : "welcome"),
+    courseGuideStatus: courseGuideStatus,
+    courseGuideError: courseGuideError,
+    onRetryCourseGuide: refreshCourseGuideAcknowledgement,
+    onAcknowledgeCourseGuide: acknowledgeCourseGuide,
+    onContinue: () => setScreen("home"),
     onManagerDashboard: () => setScreen("manager-dashboard")
-  }), screen === "welcome" && /*#__PURE__*/React.createElement(Welcome, {
-    restaurantName: branding.name,
-    onStart: () => {
-      localStorage.removeItem(`karibu-training:${RESTAURANT_ID}:${session?.staffId}:onboarding`);
-      setScreen("home");
-    },
-    resumeKey: `karibu-training:${RESTAURANT_ID}:${session?.staffId}:onboarding`,
-    onBack: () => setScreen("signed-in")
   }), screen === "home" && /*#__PURE__*/React.createElement(Home, {
     branding: branding,
     onSelect: selectModule,
@@ -4251,6 +4200,7 @@ async function bootTrainingApp() {
       RESTAURANT_ROUTE_ERROR = "Ask your manager for the correct training link.";
     } else {
       RESTAURANT_ID = data.id;
+      RESTAURANT_BRANDING = { name: data.name, app_name: data.app_name };
     }
   } else if (!RESTAURANT_ID) {
     RESTAURANT_ROUTE_ERROR = "Open the restaurant's V2 training link to continue.";

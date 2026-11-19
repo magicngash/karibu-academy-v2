@@ -2795,6 +2795,10 @@ function ManagerDashboard({
     setSaving(false);
     if (rpcError || !data.success) {
       const detail = data?.error || rpcError?.message || "unknown_error";
+      if (rpcError?.code === "PGRST202" || /schema cache|could not find.*function|not found/i.test(rpcError?.message || "")) {
+        setError("The app couldn't find the staff-creation service, so this staff member was not added. Refresh the page and try again. If it happens again, contact your app administrator.");
+        return;
+      }
       const messages = {
         name_taken: "That name is already in use.",
         invalid_department: "Enter a department of up to 80 characters.",
@@ -3004,9 +3008,10 @@ function ManagerDashboard({
     className: "screen",
     style: styles.screen
   }, error && /*#__PURE__*/React.createElement("div", {
+    role: "alert",
     style: {
       ...styles.feedbackBox,
-      ...styles.feedbackOk,
+      ...styles.errorBox,
       marginBottom: 14
     }
   }, /*#__PURE__*/React.createElement("p", {

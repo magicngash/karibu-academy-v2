@@ -59,9 +59,8 @@ async function callRpc(name, params, fetchOptions = {}) {
     const body = await res.json().catch(() => null);
     if (!res.ok) return {
       data: null,
-      error: {
-        ...(body && typeof body === "object" ? body : { message: res.statusText }),
-        status: res.status
+      error: body || {
+        message: res.statusText
       }
     };
     return {
@@ -2791,7 +2790,7 @@ function ManagerDashboard({
       p_sex: newSex || null
     };
     let createStaffResult = await callRpc("create_staff", createStaffParams);
-    if (createStaffResult.error?.status === 404 || createStaffResult.error?.code === "PGRST202") {
+    if (createStaffResult.error?.code === "PGRST202") {
       // PostgREST reports PGRST202 before invoking the RPC, so one bounded retry cannot duplicate an account.
       await new Promise(resolve => setTimeout(resolve, 350));
       createStaffResult = await callRpc("create_staff", createStaffParams);
@@ -2800,8 +2799,12 @@ function ManagerDashboard({
     setSaving(false);
     if (rpcError || !data.success) {
       const detail = data?.error || rpcError?.message || "unknown_error";
-      if (rpcError?.status === 404 || rpcError?.code === "PGRST202" || /schema cache|could not find.*function|not found/i.test(rpcError?.message || "")) {
+      if (rpcError?.code === "PGRST202" || /schema cache|could not find.*function/i.test(rpcError?.message || "")) {
         setError("The app couldn't find the staff-creation service, so this staff member was not added. Refresh the page and try again. If it happens again, contact your app administrator.");
+        return;
+      }
+      if (rpcError?.code === "42883") {
+        setError("The app couldn't securely create this account, so no new staff member was added. Please try again. If the problem continues, contact your app administrator.");
         return;
       }
       const messages = {

@@ -81,7 +81,7 @@ begin
     values(
       p_restaurant_id,
       btrim(p_full_name),
-      crypt(p_pin,gen_salt('bf')),
+      extensions.crypt(p_pin,extensions.gen_salt('bf')),
       case when p_role='manager' then 'manager' else 'staff' end,
       v_department,
       p_age_range,

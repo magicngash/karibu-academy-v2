@@ -29,6 +29,7 @@ const SUPABASE_URL = window.KARIBU_SUPABASE_URL || "https://YOUR-V2-PROJECT.supa
 const SUPABASE_ANON_KEY = window.KARIBU_SUPABASE_ANON_KEY || "YOUR_V2_PUBLISHABLE_OR_ANON_KEY";
 const AUTH_TOKEN_KEY = "karibu-v2-auth-token";
 const COURSE_GUIDE_VERSION = "service-training-guide-v1";
+const ASSESSMENT_PASS_MARK_PERCENT = 20;
 // Supported links: /training?r=<id> (legacy) or /<restaurant-slug> (preferred).
 const routeParams = new URLSearchParams(window.location.search);
 const routeParts = window.location.pathname.split("/").filter(Boolean);
@@ -2217,7 +2218,7 @@ function Complete({ score, total, writtenTotal, badgeTitle, passed, result, erro
     retaking ? /*#__PURE__*/React.createElement("p", { role: "status", "aria-live": "polite", style: styles.coverSub }, "Starting a fresh exam attempt…")
       : completing ? /*#__PURE__*/React.createElement("p", { style: styles.coverSub }, "Marking your written answers and calculating your final result…")
         : error ? /*#__PURE__*/React.createElement("p", { style: { ...styles.coverSub, color: COLORS.chili } }, error)
-          : /*#__PURE__*/React.createElement("p", { style: styles.coverSub }, "MCQ: ", mcqScore, "/", mcqTotal, ". Written: ", writtenScore, "/", writtenMax, ". Overall: ", result?.overall_percent, "%. The pass mark is 80%.", passed ? " Module passed — great work." : " You can retake the exam."),
+          : /*#__PURE__*/React.createElement("p", { style: styles.coverSub }, "MCQ: ", mcqScore, "/", mcqTotal, ". Written: ", writtenScore, "/", writtenMax, ". Overall: ", result?.overall_percent, "%. Temporary test pass mark: ", ASSESSMENT_PASS_MARK_PERCENT, "%.", passed ? " Module passed — great work." : " You can retake the exam."),
     result && /*#__PURE__*/React.createElement("div", { style: styles.scoreBox }, /*#__PURE__*/React.createElement("span", { style: styles.scoreNum }, result.overall_percent, "%"), /*#__PURE__*/React.createElement("span", { style: styles.scoreLabel }, "Overall score")),
     !passed && !completing && /*#__PURE__*/React.createElement("button", { style: styles.primaryBtn, onClick: onRetake, disabled: retaking, "aria-busy": retaking }, retaking ? "Starting exam…" : "Retake exam", !retaking && /*#__PURE__*/React.createElement(Icon, { name: "arrow", className: "icon-sm" })),
     !completing && passed && nextModuleAvailable && onNextModule && /*#__PURE__*/React.createElement("button", { style: { ...styles.primaryBtn, marginTop: 12 }, onClick: onNextModule }, "Continue to next module ", /*#__PURE__*/React.createElement(Icon, { name: "arrow", className: "icon-sm" })),
@@ -2555,9 +2556,9 @@ function CourseGuideReader({ branding, onBack }) {
       paragraph("After the last question, press Complete Module once. Keep the page open while the platform processes the assessment. Follow status messages such as “Scoring written answers: 2 of 5,” and wait for the final result instead of tapping repeatedly."),
       paragraph("The platform records submitted answers and scores written responses as part of the overall result. Your manager can review the recorded attempt, including written answers and scores."),
       React.createElement("h3", { style: { ...headingStyle, fontSize: "0.98rem", marginTop: 14 } }, "Pass mark and next steps"),
-      paragraph("You need at least 80% of the combined assessment score to pass a module. If you pass, the next module unlocks. If you do not pass, review the relevant notes and choose Retake exam. A retake starts a fresh attempt at the first exam question, not at the start of the lesson. Your previous attempt remains recorded for your manager to review."),
+      paragraph(`During temporary workflow testing only, you need at least ${ASSESSMENT_PASS_MARK_PERCENT}% of the combined assessment score to pass a module; the normal training threshold is 80%. Attempts passed during testing stay recorded as passed after the threshold is restored. If you pass, the next module unlocks. If you do not pass, review the relevant notes and choose Retake exam. A retake starts a fresh attempt at the first exam question, not at the start of the lesson. Your previous attempt remains recorded for your manager to review.`),
       React.createElement("h3", { style: { ...headingStyle, fontSize: "0.98rem", marginTop: 14 } }, "If marking takes longer than expected"),
-      paragraph("Leave the page open and follow the status message. Submitted answers and saved scores are preserved as marking progresses. If the app says your answers are safe and asks you to press Complete Module to continue scoring, press it once and wait. If the issue continues, contact your manager before starting a new account or changing your answers.")
+      paragraph("Leave the page open and follow the status message. Submitted answers and saved scores are preserved as marking progresses. If the app says your answers are safe and asks you to press Complete Module to continue scoring, press it once and wait. If the issue continues, contact your manager before starting a new account or changing your answers."),
     )), section("resume", "6. Signing out and resuming training", React.createElement(React.Fragment, null,
       paragraph("Your progress is linked to your account. If you need to stop, sign out. When you sign in again with the same account, choose Resume Training to return to the saved module and position. Saved written drafts are available when you resume, including on another browser or device."),
       paragraph("Before leaving a written question, press Save response if you want that answer submitted. The draft autosave helps protect work in progress, but it does not replace the Save response action."),
@@ -3575,7 +3576,10 @@ function App() {
   }, /*#__PURE__*/React.createElement("style", null, fontImport), session && /*#__PURE__*/React.createElement(SignOutButton, { onLogout: handleLogout }), /*#__PURE__*/React.createElement("div", {
     className: "app-shell",
     style: styles.phone
-  }, screen === "login" && /*#__PURE__*/React.createElement(Login, {
+  }, session && /*#__PURE__*/React.createElement("div", {
+    role: "alert",
+    style: { margin: "8px 14px", padding: "10px 12px", borderRadius: 10, background: "#FFF1D6", border: "1px solid #E7B95F", color: "#4A2E08", fontSize: 12, fontWeight: 700, lineHeight: 1.4, textAlign: "center" }
+  }, "TEMPORARY ASSESSMENT TEST MODE: ", ASSESSMENT_PASS_MARK_PERCENT, "% pass mark applies to all accounts. Attempts passed during this test stay recorded as passed after the 80% standard is restored."), screen === "login" && /*#__PURE__*/React.createElement(Login, {
     branding: branding,
     onLoggedIn: handleLoggedIn
   }), screen === "signed-in" && session && /*#__PURE__*/React.createElement(SignedInLanding, {

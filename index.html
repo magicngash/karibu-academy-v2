@@ -29,7 +29,6 @@ const SUPABASE_URL = window.KARIBU_SUPABASE_URL || "https://YOUR-V2-PROJECT.supa
 const SUPABASE_ANON_KEY = window.KARIBU_SUPABASE_ANON_KEY || "YOUR_V2_PUBLISHABLE_OR_ANON_KEY";
 const AUTH_TOKEN_KEY = "karibu-v2-auth-token";
 const COURSE_GUIDE_VERSION = "service-training-guide-v1";
-const COURSE_GUIDE_URL = "/course-guide.pdf";
 // Supported links: /training?r=<id> (legacy) or /<restaurant-slug> (preferred).
 const routeParams = new URLSearchParams(window.location.search);
 const routeParts = window.location.pathname.split("/").filter(Boolean);
@@ -2442,65 +2441,204 @@ function getResumeLocationLabel(resume) {
   const question = Math.min(step - quizStart + 1, (data.quiz || []).length);
   return `${data.topBarLabel || `Module ${moduleId}`} · Assessment question ${Math.max(1, question)} of ${(data.quiz || []).length}`;
 }
+function CourseGuideReader({ branding, onBack }) {
+  const restaurantName = String(branding?.name || "your restaurant").trim();
+  const appName = String(branding?.app_name || "your training app").trim();
+  const cardStyle = {
+    background: "#fff",
+    border: "1.5px solid #EFE6D4",
+    borderRadius: 18,
+    padding: "16px 16px",
+    marginBottom: 14
+  };
+  const headingStyle = {
+    ...styles.feedbackHeading,
+    color: COLORS.espresso,
+    fontSize: "1.08rem",
+    margin: "0 0 10px"
+  };
+  const paragraphStyle = {
+    ...styles.feedbackText,
+    color: "#4A4038",
+    fontSize: "0.94rem",
+    lineHeight: 1.65,
+    margin: "0 0 10px"
+  };
+  const listStyle = {
+    margin: 0,
+    paddingLeft: 21,
+    color: "#4A4038",
+    fontSize: "0.94rem",
+    lineHeight: 1.65
+  };
+  const section = (key, title, content) => React.createElement("section", {
+    key,
+    style: cardStyle
+  }, React.createElement("h2", { style: headingStyle }, title), content);
+  const paragraph = (text, key) => React.createElement("p", {
+    key,
+    style: paragraphStyle
+  }, text);
+  const bullets = items => React.createElement("ul", {
+    style: listStyle
+  }, items.map((item, index) => React.createElement("li", {
+    key: index,
+    style: { marginBottom: 7 }
+  }, item)));
+  const modules = [
+    ["Module 1: Warm Welcomes, First Impressions, and Service Presence", "Build a strong first-contact standard that works in restaurants and beyond."],
+    ["Module 2: Menu, Product, and Service Knowledge (In-Depth Menu Mastery)", "Understand products, ingredients, allergens, safe answers, and value communication."],
+    ["Module 3: Strategic Upselling Techniques", "Make helpful, ethical suggestions, read buying signals, and respect a guest’s decision."],
+    ["Module 4: Precision Order-Taking & Table Service", "Confirm orders accurately, use careful service technique, and coordinate with the kitchen and bar."],
+    ["Module 5: High-Velocity Shift Management & Billing", "Prioritise tables, handle payments smoothly, and close out a guest’s visit well."],
+    ["Module 6: Conflict Resolution & Grace Under Pressure", "Stay calm, defuse tension, and help restore a guest’s confidence when something goes wrong."],
+    ["Module 7: Communication Skills for Customer Care", "Use active listening, concise speaking, positive phrasing, and a steady tone under pressure."],
+    ["Module 8: Emotional Intelligence and Customer Psychology", "Read emotions, recognise stress, adapt to personalities, and build trust through empathy."],
+    ["Module 9: Teamwork, Accountability, and Shift Culture", "Practise peer teamwork, thorough handovers, mutual support, personal ownership, and clear reporting."],
+    ["Module 10: Service Standards, Professionalism, and Quality Control", "Apply appearance standards, cleanliness benchmarks, timing targets, quality checks, and self-auditing."]
+  ];
+  const moduleList = React.createElement("ol", {
+    style: { ...listStyle, paddingLeft: 24 }
+  }, modules.map(([title, description], index) => React.createElement("li", {
+    key: index,
+    style: { marginBottom: 12 }
+  }, React.createElement("strong", {
+    style: { color: COLORS.espresso }
+  }, title), React.createElement("br"), description)));
+  return React.createElement(React.Fragment, null,
+    React.createElement("header", {
+      className: "home-header",
+      style: styles.homeHeader
+    }, React.createElement("button", {
+      type: "button",
+      onClick: onBack,
+      style: { display: "flex", alignItems: "center", gap: 7, background: "none", border: "none", color: COLORS.marigold, cursor: "pointer", padding: 0, marginBottom: 18 }
+    }, React.createElement(Icon, { name: "back", className: "icon-sm" }), "Back to training"), React.createElement("span", {
+      style: styles.eyebrowDark
+    }, "COURSE GUIDE"), React.createElement("h1", {
+      style: { ...styles.coverTitle, color: COLORS.ivory, fontSize: "1.8rem", marginTop: 8 }
+    }, "Your Course Guide"), React.createElement("p", {
+      style: { ...styles.coverSub, color: COLORS.tan, fontSize: "0.96rem", marginTop: 6 }
+    }, `For learners at ${restaurantName} using ${appName}.`)),
+    React.createElement("main", {
+      className: "screen",
+      style: styles.screen,
+      "aria-label": "Course Guide"
+    }, section("purpose", "1. Why this course matters", React.createElement(React.Fragment, null,
+      paragraph("Good service depends on the knowledge, conduct, and commitment of every team member. Staff welcome guests, prepare and deliver food and drinks, maintain the workplace, and uphold the restaurant’s standards. These everyday actions affect guest satisfaction, operations, repeat visits, and the restaurant’s reputation."),
+      paragraph("This course gives café and restaurant teams practical guidance for delivering warm, consistent, professional service. It is relevant to front-of-house, bar, kitchen, and butchery roles. Apply what you learn in line with your restaurant’s own procedures.")
+    )), section("values", "2. The W.H.A.T. service values", React.createElement(React.Fragment, null,
+      paragraph("Use W.H.A.T. as a quick reminder of the values behind the course:"),
+      bullets([
+        "Warmth — Make guests feel welcome through a friendly greeting and a respectful manner.",
+        "Honesty — Give accurate information. If you are unsure, check rather than guess.",
+        "Attentiveness — Listen carefully, notice what guests need, and follow through.",
+        "Teamwork — Support colleagues and communicate clearly, especially during busy shifts."
+      ]),
+      paragraph("At the end of each shift, ask yourself: “Which of these values did I show today?”")
+    )), section("modules", "3. Your 10-module learning journey", React.createElement(React.Fragment, null,
+      paragraph("Complete modules in order. The course builds from welcoming guests to confident, consistent service and guest loyalty."),
+      moduleList
+    )), section("module-steps", "4. How each module works", React.createElement(React.Fragment, null,
+      bullets([
+        "Topical notes — Read the lesson for its main ideas and practical standards.",
+        "Summary takeaways — Review the key points before the assessment.",
+        "Case study or role-play — Think through a realistic restaurant situation; discuss your approach with a coach or colleague when appropriate.",
+        "Assessment — Answer the multiple-choice questions for that module and five written questions. Choose the best response for each multiple-choice item and answer written questions in your own words."
+      ])
+    )), section("assessment", "5. Assessment, results, and retakes", React.createElement(React.Fragment, null,
+      React.createElement("h3", { style: { ...headingStyle, fontSize: "0.98rem", marginTop: 14 } }, "Save each written response"),
+      paragraph("Your written answer draft autosaves as you type. A saved draft is not the same as submitting an answer. Press Save response for each written question before moving on."),
+      React.createElement("h3", { style: { ...headingStyle, fontSize: "0.98rem", marginTop: 14 } }, "Complete the assessment once"),
+      paragraph("After the last question, press Complete Module once. Keep the page open while the platform processes the assessment. Follow status messages such as “Scoring written answers: 2 of 5,” and wait for the final result instead of tapping repeatedly."),
+      paragraph("The platform records submitted answers and scores written responses as part of the overall result. Your manager can review the recorded attempt, including written answers and scores."),
+      React.createElement("h3", { style: { ...headingStyle, fontSize: "0.98rem", marginTop: 14 } }, "Pass mark and next steps"),
+      paragraph("You need at least 80% of the combined assessment score to pass a module. If you pass, the next module unlocks. If you do not pass, review the relevant notes and choose Retake exam. A retake starts a fresh attempt at the first exam question, not at the start of the lesson. Your previous attempt remains recorded for your manager to review."),
+      React.createElement("h3", { style: { ...headingStyle, fontSize: "0.98rem", marginTop: 14 } }, "If marking takes longer than expected"),
+      paragraph("Leave the page open and follow the status message. Submitted answers and saved scores are preserved as marking progresses. If the app says your answers are safe and asks you to press Complete Module to continue scoring, press it once and wait. If the issue continues, contact your manager before starting a new account or changing your answers.")
+    )), section("resume", "6. Signing out and resuming training", React.createElement(React.Fragment, null,
+      paragraph("Your progress is linked to your account. If you need to stop, sign out. When you sign in again with the same account, choose Resume Training to return to the saved module and position. Saved written drafts are available when you resume, including on another browser or device."),
+      paragraph("Before leaving a written question, press Save response if you want that answer submitted. The draft autosave helps protect work in progress, but it does not replace the Save response action."),
+      bullets([
+        "For a written question, press Save response before leaving it.",
+        "After the final question, press Complete Module once and wait for the result or the next on-screen instruction.",
+        "When you return, sign in to the same account and choose Resume Training."
+      ])
+    )), section("support", "7. Your responsibilities and where to get help", React.createElement(React.Fragment, null,
+      bullets([
+        "Complete modules in order and answer honestly in your own words.",
+        "Use what you learn on your next shift and follow your restaurant’s procedures.",
+        "Keep your account credentials private and use the same account whenever you return so your progress stays connected.",
+        "If an answer or progress does not appear as expected, keep the page open, follow the on-screen message, and contact your manager or coach.",
+        "Your manager can confirm any certificate or participation record according to the restaurant’s policy."
+      ]),
+      paragraph("Our promise: clear, practical training; a fair opportunity to review and retake; support from your coach or manager; and progress saved to your account."),
+      paragraph("Questions? If you need help with access, saved progress, or a result, contact your manager or coach.")
+    )), React.createElement("button", {
+      type: "button",
+      style: { ...styles.primaryBtn, marginTop: 2 },
+      onClick: onBack
+    }, "Back to training", React.createElement(Icon, { name: "back", className: "icon-sm" })))
+  );
+}
 function CourseGuideGate({
   status,
   error,
+  guideOpened,
+  onOpenCourseGuide,
   onRetry,
   onAcknowledge
 }) {
-  const [guideOpened, setGuideOpened] = React.useState(false);
   const [guideConfirmed, setGuideConfirmed] = React.useState(false);
   const busy = status === "checking" || status === "saving";
-  return /*#__PURE__*/React.createElement("section", {
+  return React.createElement("section", {
     "aria-labelledby": "course-guide-gate-title",
     style: { ...styles.feedbackBox, textAlign: "left", marginTop: 18, background: "#fffdf9", border: `2px solid ${COLORS.marigoldDark}` }
-  }, /*#__PURE__*/React.createElement("h2", {
+  }, React.createElement("h2", {
     id: "course-guide-gate-title",
     style: { ...styles.feedbackHeading, fontSize: "1.15rem", marginBottom: 8 }
-  }, "Please read the following instructions before proceeding"), /*#__PURE__*/React.createElement("p", {
+  }, "Please read the following instructions before proceeding"), React.createElement("p", {
     style: { ...styles.feedbackText, marginTop: 0 }
-  }, "Open the Course Guide to review how the modules, assessments, written answers, and saved progress work."), /*#__PURE__*/React.createElement("a", {
-    href: COURSE_GUIDE_URL,
-    target: "_blank",
-    rel: "noopener noreferrer",
-    onClick: () => setGuideOpened(true),
-    style: { ...styles.secondaryBtn, display: "inline-flex", justifyContent: "center", alignItems: "center", textDecoration: "none", margin: "4px 0 14px", width: "100%" }
-  }, "Open the Course Guide (PDF)"), status === "checking" && /*#__PURE__*/React.createElement("p", {
+  }, "Read the full Course Guide in the app to learn how modules, assessments, written answers, and saved progress work."), React.createElement("button", {
+    type: "button",
+    onClick: onOpenCourseGuide,
+    style: { ...styles.secondaryBtn, margin: "4px 0 14px" }
+  }, "Read the full Course Guide"), status === "checking" && React.createElement("p", {
     "aria-live": "polite",
     style: styles.feedbackText
-  }, "Checking whether your acknowledgement is already saved to your account…"), status === "saving" && /*#__PURE__*/React.createElement("p", {
+  }, "Checking whether your acknowledgement is already saved to your account…"), status === "saving" && React.createElement("p", {
     "aria-live": "polite",
     style: styles.feedbackText
-  }, "Saving your acknowledgement… Please wait."), status === "error" && /*#__PURE__*/React.createElement("div", {
+  }, "Saving your acknowledgement… Please wait."), status === "error" && React.createElement("div", {
     role: "alert",
     style: { ...styles.feedbackBox, ...styles.errorBox, marginTop: 8 }
-  }, /*#__PURE__*/React.createElement("p", {
+  }, React.createElement("p", {
     style: styles.feedbackText
-  }, error || "We couldn't verify your Course Guide acknowledgement. Please check your connection and try again."), /*#__PURE__*/React.createElement("button", {
+  }, error || "We couldn't verify your Course Guide acknowledgement. Please check your connection and try again."), React.createElement("button", {
     type: "button",
     style: styles.secondaryBtn,
     onClick: onRetry
-  }, "Check again")), status === "required" && error && /*#__PURE__*/React.createElement("div", {
+  }, "Check again")), status === "required" && error && React.createElement("div", {
     role: "alert",
     style: { ...styles.feedbackBox, ...styles.errorBox, marginTop: 8 }
-  }, /*#__PURE__*/React.createElement("p", {
+  }, React.createElement("p", {
     style: styles.feedbackText
-  }, error)), status === "required" && /*#__PURE__*/React.createElement("label", {
+  }, error)), status === "required" && React.createElement("label", {
     htmlFor: "course-guide-confirmation",
     style: { display: "flex", alignItems: "flex-start", gap: 10, margin: "8px 0 14px", color: COLORS.espresso, fontSize: "0.92rem", lineHeight: 1.5 }
-  }, /*#__PURE__*/React.createElement("input", {
+  }, React.createElement("input", {
     id: "course-guide-confirmation",
     type: "checkbox",
     checked: guideConfirmed,
     disabled: !guideOpened || busy,
     onChange: event => setGuideConfirmed(event.target.checked),
     style: { width: 20, height: 20, marginTop: 2, accentColor: COLORS.marigoldDark, flexShrink: 0 }
-  }), /*#__PURE__*/React.createElement("span", null, "I have read and understand the Course Guide.")), status === "required" && /*#__PURE__*/React.createElement("button", {
+  }), React.createElement("span", null, "I have read and understand the Course Guide.")), status === "required" && React.createElement("button", {
     type: "button",
     style: { ...styles.primaryBtn, width: "100%" },
     disabled: !guideOpened || !guideConfirmed || busy,
     onClick: onAcknowledge
-  }, "I’ve read the guide — continue ", /*#__PURE__*/React.createElement(Icon, {
+  }, "I’ve read the guide — continue ", React.createElement(Icon, {
     name: "arrow",
     className: "icon-sm"
   })));
@@ -2516,6 +2654,8 @@ function SignedInLanding({
   onResume,
   courseGuideStatus,
   courseGuideError,
+  guideOpened,
+  onOpenCourseGuide,
   onRetryCourseGuide,
   onAcknowledgeCourseGuide
 }) {
@@ -2528,87 +2668,51 @@ function SignedInLanding({
   const resumeLocation = getResumeLocationLabel(resumeTraining);
   const restaurantName = String(branding?.name || "your restaurant").trim();
   const appName = String(branding?.app_name || "your training app").trim();
-  return /*#__PURE__*/React.createElement("div", {
+  const openGuideButton = React.createElement("button", {
+    type: "button",
+    onClick: onOpenCourseGuide,
+    style: { ...styles.secondaryBtn, marginTop: 14 }
+  }, "Read the full Course Guide");
+  return React.createElement("div", {
     className: "screen",
     style: styles.screen
-  }, /*#__PURE__*/React.createElement("div", {
+  }, React.createElement("div", {
     style: styles.completeWrap
-  }, /*#__PURE__*/React.createElement("div", {
+  }, React.createElement("div", {
     style: styles.badgeCircle
-  }, /*#__PURE__*/React.createElement(Icon, {
-    name: "hand",
-    className: "icon-xl"
-  })), /*#__PURE__*/React.createElement("span", {
+  }, React.createElement(Icon, { name: "hand", className: "icon-xl" })), React.createElement("span", {
     style: styles.eyebrowLight
-  }, getBrandingLabel(branding).toUpperCase() || "TRAINING"), guideAcknowledged ? /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("h1", {
-    style: styles.coverTitle
-  }, "Welcome, ", session.fullName.split(" ")[0]), /*#__PURE__*/React.createElement("p", {
-    style: styles.coverSub
-  }, "You're signed in as ", /*#__PURE__*/React.createElement("strong", null, session.fullName), isManager ? " (Manager)" : "", `. Training at ${restaurantName} with ${appName}.`), isManager && session.paymentStatus === "overdue" && /*#__PURE__*/React.createElement("div", {
-    style: { ...styles.feedbackBox, ...styles.errorBox, textAlign: "left", marginTop: 4 }
-  }, /*#__PURE__*/React.createElement("span", {
-    style: styles.feedbackHeading
-  }, "Payment overdue"), /*#__PURE__*/React.createElement("p", {
-    style: styles.feedbackText
-  }, `This restaurant's ${appName} subscription has an overdue payment. Staff can still train for now, but please settle the invoice to avoid account suspension.`)), resumeLookupError && /*#__PURE__*/React.createElement("div", {
-    role: "alert",
-    style: { ...styles.feedbackBox, ...styles.feedbackBad, textAlign: "left", marginTop: 12 }
-  }, /*#__PURE__*/React.createElement("p", {
-    style: styles.feedbackText
-  }, resumeLookupError), /*#__PURE__*/React.createElement("button", {
-    type: "button",
-    style: styles.secondaryBtn,
-    onClick: onRetryResume
-  }, "Check again")), /*#__PURE__*/React.createElement("a", {
-    href: COURSE_GUIDE_URL,
-    target: "_blank",
-    rel: "noopener noreferrer",
-    style: { ...styles.secondaryBtn, display: "inline-flex", justifyContent: "center", alignItems: "center", textDecoration: "none", width: "100%", marginTop: 14 }
-  }, "Open the Course Guide (PDF)"), resumeTraining && /*#__PURE__*/React.createElement("section", {
-    "aria-labelledby": "resume-training-title",
-    style: { ...styles.feedbackBox, textAlign: "left", marginTop: 16, border: `2px solid ${COLORS.marigoldDark}`, background: "#fffdf9", boxShadow: "0 8px 20px rgba(49, 40, 31, 0.12)" }
-  }, /*#__PURE__*/React.createElement("h2", {
-    id: "resume-training-title",
-    style: { ...styles.feedbackHeading, fontSize: "1.15rem", marginBottom: 6 }
-  }, "Resume Training"), /*#__PURE__*/React.createElement("p", {
-    style: { ...styles.feedbackText, marginTop: 0 }
-  }, "Pick up where you left off: ", resumeTitle, ". ", resumeLocation, "."), /*#__PURE__*/React.createElement("button", {
-    type: "button",
-    style: { ...styles.primaryBtn, width: "100%", marginTop: 10 },
-    onClick: onResume
-  }, "Resume Training ", /*#__PURE__*/React.createElement(Icon, {
-    name: "arrow",
-    className: "icon-sm"
-  }))), isManager ? /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("button", {
-    type: "button",
-    style: { ...styles.primaryBtn, marginTop: 18 },
-    onClick: onManagerDashboard
-  }, "Open Manager Dashboard ", /*#__PURE__*/React.createElement(Icon, {
-    name: "arrow",
-    className: "icon-sm"
-  })), /*#__PURE__*/React.createElement("button", {
-    type: "button",
-    style: { background: "none", border: "none", color: COLORS.stone, fontSize: "0.85rem", marginTop: 14, cursor: "pointer" },
-    onClick: onContinue
-  }, "Or continue to staff training →")) : /*#__PURE__*/React.createElement("button", {
-    type: "button",
-    style: { ...styles.primaryBtn, marginTop: 18 },
-    onClick: onContinue
-  }, "Continue ", /*#__PURE__*/React.createElement(Icon, {
-    name: "arrow",
-    className: "icon-sm"
-  }))) : /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("h1", {
-    style: styles.coverTitle
-  }, `Welcome to ${restaurantName} Training`), /*#__PURE__*/React.createElement("p", {
-    style: styles.coverSub
-  }, `The ${appName} course will help you build practical skills and confidence to deliver excellent service, every shift.`), /*#__PURE__*/React.createElement(CourseGuideGate, {
-    status: courseGuideStatus,
-    error: courseGuideError,
-    onRetry: onRetryCourseGuide,
-    onAcknowledge: onAcknowledgeCourseGuide
-  }))));
+  }, getBrandingLabel(branding).toUpperCase() || "TRAINING"), guideAcknowledged ? React.createElement(React.Fragment, null,
+    React.createElement("h1", { style: styles.coverTitle }, "Welcome, ", session.fullName.split(" ")[0]),
+    React.createElement("p", { style: styles.coverSub }, "You're signed in as ", React.createElement("strong", null, session.fullName), isManager ? " (Manager)" : "", `. Training at ${restaurantName} with ${appName}.`),
+    isManager && session.paymentStatus === "overdue" && React.createElement("div", {
+      style: { ...styles.feedbackBox, ...styles.errorBox, textAlign: "left", marginTop: 4 }
+    }, React.createElement("span", { style: styles.feedbackHeading }, "Payment overdue"), React.createElement("p", { style: styles.feedbackText }, `This restaurant's ${appName} subscription has an overdue payment. Staff can still train for now, but please settle the invoice to avoid account suspension.`)),
+    resumeLookupError && React.createElement("div", {
+      role: "alert",
+      style: { ...styles.feedbackBox, ...styles.feedbackBad, textAlign: "left", marginTop: 12 }
+    }, React.createElement("p", { style: styles.feedbackText }, resumeLookupError), React.createElement("button", { type: "button", style: styles.secondaryBtn, onClick: onRetryResume }, "Check again")),
+    openGuideButton,
+    resumeTraining && React.createElement("section", {
+      "aria-labelledby": "resume-training-title",
+      style: { ...styles.feedbackBox, textAlign: "left", marginTop: 16, border: `2px solid ${COLORS.marigoldDark}`, background: "#fffdf9", boxShadow: "0 8px 20px rgba(49, 40, 31, 0.12)" }
+    }, React.createElement("h2", { id: "resume-training-title", style: { ...styles.feedbackHeading, fontSize: "1.15rem", marginBottom: 6 } }, "Resume Training"), React.createElement("p", { style: { ...styles.feedbackText, marginTop: 0 } }, "Pick up where you left off: ", resumeTitle, ". ", resumeLocation, "."), React.createElement("button", { type: "button", style: { ...styles.primaryBtn, width: "100%", marginTop: 10 }, onClick: onResume }, "Resume Training ", React.createElement(Icon, { name: "arrow", className: "icon-sm" }))),
+    isManager ? React.createElement(React.Fragment, null,
+      React.createElement("button", { type: "button", style: { ...styles.primaryBtn, marginTop: 18 }, onClick: onManagerDashboard }, "Open Manager Dashboard ", React.createElement(Icon, { name: "arrow", className: "icon-sm" })),
+      React.createElement("button", { type: "button", style: { background: "none", border: "none", color: COLORS.stone, fontSize: "0.85rem", marginTop: 14, cursor: "pointer" }, onClick: onContinue }, "Or continue to staff training →")) : React.createElement("button", { type: "button", style: { ...styles.primaryBtn, marginTop: 18 }, onClick: onContinue }, "Continue ", React.createElement(Icon, { name: "arrow", className: "icon-sm" }))
+  ) : React.createElement(React.Fragment, null,
+    React.createElement("h1", { style: styles.coverTitle }, `Welcome to ${restaurantName} Training`),
+    React.createElement("p", { style: styles.coverSub }, `The ${appName} course will help you build practical skills and confidence to deliver excellent service, every shift.`),
+    React.createElement(CourseGuideGate, {
+      status: courseGuideStatus,
+      error: courseGuideError,
+      guideOpened,
+      onOpenCourseGuide,
+      onRetry: onRetryCourseGuide,
+      onAcknowledge: onAcknowledgeCourseGuide
+    })
+  )));
 }
-
 function ManagerDashboard({
   onExit
 }) {
@@ -3021,6 +3125,7 @@ function Home({
   session,
   onBackToLanding,
   onManagerDashboard,
+  onOpenCourseGuide,
   onLogout
 }) {
   const doneCount = completedIds.length;
@@ -3112,12 +3217,11 @@ function Home({
         ...styles.coverSub,
         marginBottom: 4
       }
-    }, session?.fullName ? `Welcome back, ${session.fullName.split(" ")[0]}. ` : "", `The ${branding?.app_name || "training"} course includes ten modules to help you serve guests confidently at ${branding?.name || "your restaurant"}.`), React.createElement("a", {
-      href: COURSE_GUIDE_URL,
-      target: "_blank",
-      rel: "noopener noreferrer",
-      style: { ...styles.secondaryBtn, display: "inline-flex", justifyContent: "center", alignItems: "center", textDecoration: "none", marginTop: 10, marginBottom: 6 }
-    }, "Open Course Guide (PDF)"), React.createElement("div", {
+    }, session?.fullName ? `Welcome back, ${session.fullName.split(" ")[0]}. ` : "", `The ${branding?.app_name || "training"} course includes ten modules to help you serve guests confidently at ${branding?.name || "your restaurant"}.`), React.createElement("button", {
+      type: "button",
+      onClick: onOpenCourseGuide,
+      style: { ...styles.secondaryBtn, marginTop: 10, marginBottom: 6 }
+    }, "Read the Course Guide"), React.createElement("div", {
       style: styles.overallRow
     }, React.createElement("div", {
       style: styles.progressTrack
@@ -3165,7 +3269,7 @@ function App() {
       }
     }, "Back to home"));
   }
-  const [screen, setScreen] = React.useState("login"); // 'login' | 'signed-in' | 'home' | 'module' | 'coming-soon' | 'manager-dashboard'
+  const [screen, setScreen] = React.useState("login"); // 'login' | 'signed-in' | 'course-guide' | 'home' | 'module' | 'coming-soon' | 'manager-dashboard'
   const [session, setSession] = React.useState(null); // { staffId, fullName, role }
   const [activeMod, setActiveMod] = React.useState(null);
   const [completedIds, setCompletedIds] = React.useState([]);
@@ -3174,6 +3278,8 @@ function App() {
   const [moduleResumeSnapshot, setModuleResumeSnapshot] = React.useState(null);
   const [courseGuideStatus, setCourseGuideStatus] = React.useState("idle");
   const [courseGuideError, setCourseGuideError] = React.useState("");
+  const [guideOpened, setGuideOpened] = React.useState(false);
+  const [courseGuideReturnScreen, setCourseGuideReturnScreen] = React.useState("signed-in");
   const [branding, setBranding] = React.useState(() => RESTAURANT_BRANDING || { name: "", app_name: "" });
   const [sessionId, setSessionId] = React.useState(null); // usage-tracking session, separate from staff login session
 
@@ -3190,8 +3296,8 @@ function App() {
   React.useEffect(() => {
     const restaurantName = String(branding?.name || "").trim();
     const appName = String(branding?.app_name || "").trim();
-    if (restaurantName && appName) document.title = `${appName} · ${restaurantName} Training`;
-  }, [branding?.name, branding?.app_name]);
+    if (restaurantName && appName) document.title = screen === "course-guide" ? `${appName} · Course Guide` : `${appName} · ${restaurantName} Training`;
+  }, [branding?.name, branding?.app_name, screen]);
 
   // Heartbeat every 60s while a usage session is active, so "time spent" can
   // be estimated even if someone just closes the tab without signing out.
@@ -3233,6 +3339,14 @@ function App() {
     try { localStorage.setItem(lastPageKey, JSON.stringify({ screen, updatedAt: Date.now() })); } catch (_) {}
   }, [session?.staffId, screen]);
 
+  function openCourseGuide(returnScreen) {
+    setGuideOpened(true);
+    setCourseGuideReturnScreen(returnScreen === "home" ? "home" : "signed-in");
+    setScreen("course-guide");
+  }
+  function closeCourseGuide() {
+    setScreen(courseGuideReturnScreen);
+  }
   async function refreshCourseGuideAcknowledgement() {
     setCourseGuideStatus("checking");
     setCourseGuideError("");
@@ -3409,6 +3523,8 @@ function App() {
     setModuleResumeSnapshot(null);
     setCourseGuideStatus("idle");
     setCourseGuideError("");
+    setGuideOpened(false);
+    setCourseGuideReturnScreen("signed-in");
     setActiveMod(null);
     setScreen("login");
   }
@@ -3467,8 +3583,13 @@ function App() {
     courseGuideError: courseGuideError,
     onRetryCourseGuide: refreshCourseGuideAcknowledgement,
     onAcknowledgeCourseGuide: acknowledgeCourseGuide,
+    guideOpened: guideOpened,
+    onOpenCourseGuide: () => openCourseGuide("signed-in"),
     onContinue: () => setScreen("home"),
     onManagerDashboard: () => setScreen("manager-dashboard")
+  }), screen === "course-guide" && session && /*#__PURE__*/React.createElement(CourseGuideReader, {
+    branding: branding,
+    onBack: closeCourseGuide
   }), screen === "home" && /*#__PURE__*/React.createElement(Home, {
     branding: branding,
     onSelect: selectModule,
@@ -3476,6 +3597,7 @@ function App() {
     session: session,
     onBackToLanding: () => setScreen("signed-in"),
     onManagerDashboard: () => setScreen("manager-dashboard"),
+    onOpenCourseGuide: () => openCourseGuide("home"),
     onLogout: handleLogout
   }), screen === "module" && activeMod && MODULE_DATA[activeMod.id] && /*#__PURE__*/React.createElement(ModuleFlow, {
     moduleData: MODULE_DATA[activeMod.id],

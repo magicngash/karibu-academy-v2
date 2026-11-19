@@ -59,8 +59,9 @@ async function callRpc(name, params, fetchOptions = {}) {
     const body = await res.json().catch(() => null);
     if (!res.ok) return {
       data: null,
-      error: body || {
-        message: res.statusText
+      error: {
+        ...(body && typeof body === "object" ? body : { message: res.statusText }),
+        status: res.status
       }
     };
     return {
@@ -2780,10 +2781,7 @@ function ManagerDashboard({
     }
     setError("");
     setSaving(true);
-    const {
-      data,
-      error: rpcError
-    } = await callRpc("create_staff", {
+    const createStaffParams = {
       p_restaurant_id: RESTAURANT_ID,
       p_full_name: newName.trim(),
       p_pin: newPin,
@@ -2791,11 +2789,18 @@ function ManagerDashboard({
       p_department: newDepartment.trim(),
       p_age_range: newAgeRange || null,
       p_sex: newSex || null
-    });
+    };
+    let createStaffResult = await callRpc("create_staff", createStaffParams);
+    if (createStaffResult.error?.status === 404 || createStaffResult.error?.code === "PGRST202") {
+      // PostgREST reports PGRST202 before invoking the RPC, so one bounded retry cannot duplicate an account.
+      await new Promise(resolve => setTimeout(resolve, 350));
+      createStaffResult = await callRpc("create_staff", createStaffParams);
+    }
+    const { data, error: rpcError } = createStaffResult;
     setSaving(false);
     if (rpcError || !data.success) {
       const detail = data?.error || rpcError?.message || "unknown_error";
-      if (rpcError?.code === "PGRST202" || /schema cache|could not find.*function|not found/i.test(rpcError?.message || "")) {
+      if (rpcError?.status === 404 || rpcError?.code === "PGRST202" || /schema cache|could not find.*function|not found/i.test(rpcError?.message || "")) {
         setError("The app couldn't find the staff-creation service, so this staff member was not added. Refresh the page and try again. If it happens again, contact your app administrator.");
         return;
       }

@@ -13,12 +13,12 @@ select t.table_name,r.role_name,p.privilege_type,has_table_privilege(r.role_name
 
 -- 4. Exact public RPC inventory and signature presence. Every row should have function_found=true.
 with expected(name,signature,identity_args) as (values
-('create_staff','uuid, text, text, text, text','uuid, text, text, text, text'),('end_session','uuid, text','uuid, text'),('get_my_progress','uuid, text','uuid, text'),('get_restaurant_by_slug','text','text'),('get_restaurant_info','uuid, text','uuid, text'),('heartbeat_session','uuid, text','uuid, text'),('manager_dashboard','uuid, text','uuid, text'),('owner_change_pin','text, text, text','text, text, text'),('owner_create_restaurant','text, text, text, text, text','text, text, text, text, text'),('owner_delete_restaurant','uuid, text','uuid, text'),('owner_list_restaurants','text','text'),('owner_login','text, text, text','text, text, text'),('owner_monthly_report','uuid, integer, integer, text','uuid, integer, integer, text'),('owner_update_branding','uuid, text, text, text','uuid, text, text, text'),('owner_update_restaurant_status','uuid, text, text, text','uuid, text, text, text'),('reset_staff_pin','uuid, text, text','uuid, text, text'),('revoke_token','text','text'),('staff_login','uuid, text, text, text','uuid, text, text, text'),('start_session','uuid, text','uuid, text'),('upsert_progress','uuid, integer, text, integer, integer, text','uuid, integer, text, integer, integer, text'))
+('create_staff','uuid, text, text, text, text, text, text, text','uuid, text, text, text, text, text, text, text'),('end_session','uuid, text','uuid, text'),('get_my_progress','uuid, text','uuid, text'),('get_restaurant_by_slug','text','text'),('get_restaurant_info','uuid, text','uuid, text'),('heartbeat_session','uuid, text','uuid, text'),('manager_dashboard','uuid, text','uuid, text'),('owner_change_pin','text, text, text','text, text, text'),('owner_create_restaurant','text, text, text, text, text','text, text, text, text, text'),('owner_delete_restaurant','uuid, text','uuid, text'),('owner_list_restaurants','text','text'),('owner_login','text, text, text','text, text, text'),('owner_monthly_report','uuid, integer, integer, text','uuid, integer, integer, text'),('owner_update_branding','uuid, text, text, text','uuid, text, text, text'),('owner_update_restaurant_status','uuid, text, text, text','uuid, text, text, text'),('reset_staff_pin','uuid, text, text','uuid, text, text'),('revoke_token','text','text'),('staff_login','uuid, text, text, text','uuid, text, text, text'),('start_session','uuid, text','uuid, text'),('upsert_progress','uuid, integer, text, integer, integer, text','uuid, integer, text, integer, integer, text'))
 select e.name,e.signature,exists(select 1 from pg_proc p join pg_namespace n on n.oid=p.pronamespace where n.nspname='public' and p.proname=e.name and pg_get_function_identity_arguments(p.oid)=e.identity_args) as function_found from expected e order by e.name;
 
 -- 5. Every expected RPC must be executable by anon/authenticated, but not PUBLIC.
 with expected(name,signature) as (values
-('create_staff','uuid, text, text, text, text'),('end_session','uuid, text'),('get_my_progress','uuid, text'),('get_restaurant_by_slug','text'),('get_restaurant_info','uuid, text'),('heartbeat_session','uuid, text'),('manager_dashboard','uuid, text'),('owner_change_pin','text, text, text'),('owner_create_restaurant','text, text, text, text, text'),('owner_delete_restaurant','uuid, text'),('owner_list_restaurants','text'),('owner_login','text, text, text'),('owner_monthly_report','uuid, integer, integer, text'),('owner_update_branding','uuid, text, text, text'),('owner_update_restaurant_status','uuid, text, text, text'),('reset_staff_pin','uuid, text, text'),('revoke_token','text'),('staff_login','uuid, text, text, text'),('start_session','uuid, text'),('upsert_progress','uuid, integer, text, integer, integer, text'))
+('create_staff','uuid, text, text, text, text, text, text, text'),('end_session','uuid, text'),('get_my_progress','uuid, text'),('get_restaurant_by_slug','text'),('get_restaurant_info','uuid, text'),('heartbeat_session','uuid, text'),('manager_dashboard','uuid, text'),('owner_change_pin','text, text, text'),('owner_create_restaurant','text, text, text, text, text'),('owner_delete_restaurant','uuid, text'),('owner_list_restaurants','text'),('owner_login','text, text, text'),('owner_monthly_report','uuid, integer, integer, text'),('owner_update_branding','uuid, text, text, text'),('owner_update_restaurant_status','uuid, text, text, text'),('reset_staff_pin','uuid, text, text'),('revoke_token','text'),('staff_login','uuid, text, text, text'),('start_session','uuid, text'),('upsert_progress','uuid, integer, text, integer, integer, text'))
 select e.name,e.signature,has_function_privilege('anon','public.'||e.name||'('||e.signature||')','EXECUTE') as anon_execute,has_function_privilege('authenticated','public.'||e.name||'('||e.signature||')','EXECUTE') as authenticated_execute,exists(select 1 from pg_proc p join pg_namespace n on n.oid=p.pronamespace cross join lateral aclexplode(coalesce(p.proacl,acldefault('f',p.proowner))) acl where n.nspname='public' and p.proname=e.name and pg_get_function_identity_arguments(p.oid)=e.signature and acl.grantee=0) as public_execute from expected e order by e.name;
 
 -- 6. Private helper presence and absence of role execution privileges.
@@ -40,14 +40,16 @@ where conrelid in ('public.staff'::regclass,'public.owners'::regclass)
   and contype in ('p','u','c')
 order by conrelid::text,conname;
 
--- 9. The create_staff source must contain both the normalized pre-check and
---    a unique_violation handler. This confirms the race-safe RPC contract.
+-- 9. The create_staff source must retain its race-safe name check and persist validated profile fields.
 select position('lower(btrim(full_name))' in pg_get_functiondef(p.oid)) > 0 as has_normalized_precheck,
-       position('unique_violation' in pg_get_functiondef(p.oid)) > 0 as handles_unique_violation
+       position('unique_violation' in pg_get_functiondef(p.oid)) > 0 as handles_unique_violation,
+       position('invalid_department' in pg_get_functiondef(p.oid)) > 0 as validates_department,
+       position('age_range' in pg_get_functiondef(p.oid)) > 0 as handles_age_range,
+       position('sex' in pg_get_functiondef(p.oid)) > 0 as handles_sex
 from pg_proc p
 join pg_namespace n on n.oid=p.pronamespace
 where n.nspname='public' and p.proname='create_staff'
-  and pg_get_function_identity_arguments(p.oid)='uuid, text, text, text, text';
+  and pg_get_function_identity_arguments(p.oid)='uuid, text, text, text, text, text, text, text';
 
 -- 10. Manual integration/security scenarios requiring disposable test data.
 -- Use two concurrent manager sessions against one restaurant:

@@ -2718,10 +2718,29 @@ function SignedInLanding({
 function ManagerDashboard({
   onExit
 }) {
+  const ageRangeOptions = [
+    { value: "under_18", label: "Under 18" },
+    { value: "18_24", label: "18–24" },
+    { value: "25_34", label: "25–34" },
+    { value: "35_44", label: "35–44" },
+    { value: "45_54", label: "45–54" },
+    { value: "55_plus", label: "55 or over" },
+    { value: "prefer_not_to_say", label: "Prefer not to say" }
+  ];
+  const sexOptions = [
+    { value: "female", label: "Female" },
+    { value: "male", label: "Male" },
+    { value: "intersex", label: "Intersex" },
+    { value: "prefer_not_to_say", label: "Prefer not to say" }
+  ];
+  const profileChoiceLabel = (options, value) => options.find(option => option.value === value)?.label || "Not provided";
   const [rows, setRows] = React.useState(null);
   const [error, setError] = React.useState("");
   const [showAddStaff, setShowAddStaff] = React.useState(false);
   const [newName, setNewName] = React.useState("");
+  const [newDepartment, setNewDepartment] = React.useState("");
+  const [newAgeRange, setNewAgeRange] = React.useState("");
+  const [newSex, setNewSex] = React.useState("");
   const [newPin, setNewPin] = React.useState("");
   const [newRole, setNewRole] = React.useState("staff");
   const [saving, setSaving] = React.useState(false);
@@ -2749,7 +2768,11 @@ function ManagerDashboard({
   }, []);
   async function handleAddStaff(e) {
     e.preventDefault();
-    if (!newName.trim() || newPin.length !== 4) return;
+    if (!newName.trim() || !newDepartment.trim() || newPin.length !== 4) {
+      setError("Enter the staff member’s full name, department, and a 4-digit PIN.");
+      return;
+    }
+    setError("");
     setSaving(true);
     const {
       data,
@@ -2758,15 +2781,27 @@ function ManagerDashboard({
       p_restaurant_id: RESTAURANT_ID,
       p_full_name: newName.trim(),
       p_pin: newPin,
-      p_role: newRole
+      p_role: newRole,
+      p_department: newDepartment.trim(),
+      p_age_range: newAgeRange || null,
+      p_sex: newSex || null
     });
     setSaving(false);
     if (rpcError || !data.success) {
       const detail = data?.error || rpcError?.message || "unknown_error";
-      setError(detail === "name_taken" ? "That name is already in use." : `Couldn't add that staff member (${detail}).`);
+      const messages = {
+        name_taken: "That name is already in use.",
+        invalid_department: "Enter a department of up to 80 characters.",
+        invalid_age_range: "Choose a valid age range or leave it blank.",
+        invalid_sex: "Choose a valid sex option or leave it blank."
+      };
+      setError(messages[detail] || `Couldn't add that staff member (${detail}).`);
       return;
     }
     setNewName("");
+    setNewDepartment("");
+    setNewAgeRange("");
+    setNewSex("");
     setNewPin("");
     setNewRole("staff");
     setShowAddStaff(false);
@@ -2797,6 +2832,9 @@ function ManagerDashboard({
         staff_id: r.staff_id,
         full_name: r.full_name,
         role: r.role,
+        department: r.department,
+        age_range: r.age_range,
+        sex: r.sex,
         byModule: {},
         records: {}
       };
@@ -2980,6 +3018,7 @@ function ManagerDashboard({
     }
   }, filteredStaff.map(s => {
     const doneCount = MODULES.filter(m => s.byModule[m.id] === "complete").length;
+    const profileSummary = `Department: ${s.department || "Not set"} · Age range: ${profileChoiceLabel(ageRangeOptions, s.age_range)} · Sex: ${profileChoiceLabel(sexOptions, s.sex)}`;
     return /*#__PURE__*/React.createElement("div", {
       key: s.staff_id,
       style: styles.moduleCard
@@ -2999,6 +3038,8 @@ function ManagerDashboard({
     }, s.full_name), s.role === "manager" && /*#__PURE__*/React.createElement("span", {
       style: styles.moduleCardNum
     }, "MANAGER")), /*#__PURE__*/React.createElement("span", {
+      style: { ...styles.moduleCardBlurb, display: "block", marginTop: 3 }
+    }, profileSummary), /*#__PURE__*/React.createElement("span", {
       style: styles.moduleCardBlurb
     }, doneCount, " of ", MODULES.length, " modules complete"), /*#__PURE__*/React.createElement("div", {
       style: {
@@ -3076,8 +3117,45 @@ function ManagerDashboard({
     style: styles.textInput,
     value: newName,
     onChange: e => setNewName(e.target.value),
-    placeholder: "e.g. James Otieno"
+    placeholder: "e.g. James Otieno",
+    maxLength: 160,
+    required: true
   })), /*#__PURE__*/React.createElement("div", {
+    style: styles.section
+  }, /*#__PURE__*/React.createElement("span", {
+    style: styles.sectionLabel
+  }, "Department"), /*#__PURE__*/React.createElement("input", {
+    style: styles.textInput,
+    value: newDepartment,
+    onChange: e => setNewDepartment(e.target.value),
+    placeholder: "e.g. Front of House",
+    maxLength: 80,
+    required: true
+  })), /*#__PURE__*/React.createElement("div", {
+    style: styles.section
+  }, /*#__PURE__*/React.createElement("span", {
+    style: styles.sectionLabel
+  }, "Age range (optional)"), /*#__PURE__*/React.createElement("select", {
+    style: styles.textInput,
+    value: newAgeRange,
+    onChange: e => setNewAgeRange(e.target.value)
+  }, /*#__PURE__*/React.createElement("option", { value: "" }, "Not provided"), ageRangeOptions.map(option => /*#__PURE__*/React.createElement("option", {
+    key: option.value,
+    value: option.value
+  }, option.label)))), /*#__PURE__*/React.createElement("div", {
+    style: styles.section
+  }, /*#__PURE__*/React.createElement("span", {
+    style: styles.sectionLabel
+  }, "Sex (optional)"), /*#__PURE__*/React.createElement("select", {
+    style: styles.textInput,
+    value: newSex,
+    onChange: e => setNewSex(e.target.value)
+  }, /*#__PURE__*/React.createElement("option", { value: "" }, "Not provided"), sexOptions.map(option => /*#__PURE__*/React.createElement("option", {
+    key: option.value,
+    value: option.value
+  }, option.label)))), /*#__PURE__*/React.createElement("p", {
+    style: { ...styles.moduleCardBlurb, margin: "-4px 0 12px", lineHeight: 1.4 }
+  }, "Age range and sex are optional. Ask the staff member rather than guessing; only managers at this restaurant can view them. They do not affect training scores."), /*#__PURE__*/React.createElement("div", {
     style: styles.section
   }, /*#__PURE__*/React.createElement("span", {
     style: styles.sectionLabel
@@ -3086,7 +3164,8 @@ function ManagerDashboard({
     value: newPin,
     onChange: e => setNewPin(e.target.value.replace(/\D/g, "").slice(0, 4)),
     placeholder: "••••",
-    inputMode: "numeric"
+    inputMode: "numeric",
+    required: true
   })), /*#__PURE__*/React.createElement("div", {
     style: styles.section
   }, /*#__PURE__*/React.createElement("span", {

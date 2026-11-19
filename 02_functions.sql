@@ -112,17 +112,63 @@ returns jsonb language plpgsql security definer set search_path=pg_catalog,publi
 create or replace function public.owner_delete_restaurant(p_restaurant_id uuid,p_auth_token text default null)
 returns jsonb language plpgsql security definer set search_path=public,private,pg_temp as $$ begin if not exists(select 1 from private.auth(p_auth_token) where principal_type='owner') then return jsonb_build_object('success',false,'error','unauthorized'); end if; delete from public.restaurants where id=p_restaurant_id; return jsonb_build_object('success',true); end; $$;
 
-create or replace function public.create_staff(p_restaurant_id uuid,p_full_name text,p_pin text,p_role text default 'staff',p_auth_token text default null)
+create or replace function public.create_staff(
+  p_restaurant_id uuid,
+  p_full_name text,
+  p_pin text,
+  p_role text default 'staff',
+  p_auth_token text default null,
+  p_department text default 'Unassigned',
+  p_age_range text default null,
+  p_sex text default null
+)
 returns jsonb language plpgsql security definer set search_path=public,private,pg_temp as $$
-declare a public.auth_sessions; sid uuid;
+declare
+  a public.auth_sessions;
+  sid uuid;
+  v_department text;
 begin
   select * into a from private.auth(p_auth_token);
-  if a.principal_type is distinct from 'staff' or a.restaurant_id<>p_restaurant_id or not exists(select 1 from public.staff where id=a.principal_id and role='manager') then return jsonb_build_object('success',false,'error','unauthorized'); end if;
-  if p_pin !~ '^[0-9]{4}$' then return jsonb_build_object('success',false,'error','pin_must_be_4_digits'); end if;
-  if exists(select 1 from public.staff where restaurant_id=p_restaurant_id and lower(btrim(full_name))=lower(btrim(p_full_name))) then return jsonb_build_object('success',false,'error','name_taken'); end if;
+  if a.principal_type is distinct from 'staff'
+     or a.restaurant_id is distinct from p_restaurant_id
+     or not exists (select 1 from public.staff where id=a.principal_id and role='manager') then
+    return jsonb_build_object('success',false,'error','unauthorized');
+  end if;
+  if p_pin is null or p_pin !~ '^[0-9]{4}$' then
+    return jsonb_build_object('success',false,'error','pin_must_be_4_digits');
+  end if;
+  if p_full_name is null or length(btrim(p_full_name)) not between 1 and 160 then
+    return jsonb_build_object('success',false,'error','invalid_full_name');
+  end if;
+  -- Preserve compatibility with an already-open older app; the current form requires a department.
+  v_department := btrim(p_department);
+  if p_department is null or length(v_department) not between 1 and 80 then
+    return jsonb_build_object('success',false,'error','invalid_department');
+  end if;
+  if p_age_range is not null and p_age_range not in ('under_18','18_24','25_34','35_44','45_54','55_plus','prefer_not_to_say') then
+    return jsonb_build_object('success',false,'error','invalid_age_range');
+  end if;
+  if p_sex is not null and p_sex not in ('female','male','intersex','prefer_not_to_say') then
+    return jsonb_build_object('success',false,'error','invalid_sex');
+  end if;
+  if exists (
+    select 1 from public.staff
+    where restaurant_id=p_restaurant_id
+      and lower(btrim(full_name))=lower(btrim(p_full_name))
+  ) then
+    return jsonb_build_object('success',false,'error','name_taken');
+  end if;
   begin
-    insert into public.staff(restaurant_id,full_name,pin_hash,role)
-    values(p_restaurant_id,btrim(p_full_name),crypt(p_pin,gen_salt('bf')),case when p_role='manager' then 'manager' else 'staff' end)
+    insert into public.staff(restaurant_id,full_name,pin_hash,role,department,age_range,sex)
+    values(
+      p_restaurant_id,
+      btrim(p_full_name),
+      crypt(p_pin,gen_salt('bf')),
+      case when p_role='manager' then 'manager' else 'staff' end,
+      v_department,
+      p_age_range,
+      p_sex
+    )
     returning id into sid;
   exception when unique_violation then
     return jsonb_build_object('success',false,'error','name_taken');
@@ -144,6 +190,19 @@ create or replace function public.heartbeat_session(p_session_id uuid,p_auth_tok
 create or replace function public.end_session(p_session_id uuid,p_auth_token text default null) returns jsonb language plpgsql security definer set search_path=public,private,pg_temp as $$ begin if not exists(select 1 from public.sessions s join private.auth(p_auth_token) a on a.principal_id=s.staff_id where s.id=p_session_id and a.principal_type='staff') then return jsonb_build_object('success',false,'error','unauthorized'); end if; update public.sessions set ended_at=coalesce(ended_at,now()),last_heartbeat=now() where id=p_session_id; return jsonb_build_object('success',true); end; $$;
 
 create or replace function public.manager_dashboard(p_restaurant_id uuid,p_auth_token text default null)
+returns table(staff_id uuid,full_name text,role text,department text,age_range text,sex text,module_id integer,status text,quiz_score integer,quiz_total integer,updated_at timestamptz) language sql security definer set search_path=public,private,pg_temp as $$
+  select s.id,s.full_name,s.role,s.department,s.age_range,s.sex,p.module_id,coalesce(p.status,'not_started'),p.quiz_score,p.quiz_total,p.updated_at
+  from public.staff s
+  left join public.module_progress p on p.staff_id=s.id
+  where s.restaurant_id=p_restaurant_id
+    and exists (
+      select 1 from private.auth(p_auth_token) a
+      where a.principal_type='staff'
+        and a.restaurant_id=p_restaurant_id
+        and exists (select 1 from public.staff m where m.id=a.principal_id and m.role='manager')
+    )
+  order by s.full_name,p.module_id
+$$;
 returns table(staff_id uuid,full_name text,role text,module_id integer,status text,quiz_score integer,quiz_total integer,updated_at timestamptz) language sql security definer set search_path=public,private,pg_temp as $$ select s.id,s.full_name,s.role,p.module_id,coalesce(p.status,'not_started'),p.quiz_score,p.quiz_total,p.updated_at from public.staff s left join public.module_progress p on p.staff_id=s.id where s.restaurant_id=p_restaurant_id and exists(select 1 from private.auth(p_auth_token) a where a.principal_type='staff' and a.restaurant_id=p_restaurant_id and exists(select 1 from public.staff m where m.id=a.principal_id and m.role='manager')) order by s.full_name,p.module_id $$;
 
 create or replace function public.owner_monthly_report(p_restaurant_id uuid,p_year integer,p_month integer,p_auth_token text default null)

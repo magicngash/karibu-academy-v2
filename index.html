@@ -1124,6 +1124,7 @@ function ModuleFlow({
   onExit,
   onFinish,
   onNextModule,
+  nextModuleAvailable,
   resumeKey,
   isManager,
   onManagerDashboard,
@@ -1707,7 +1708,8 @@ function ModuleFlow({
     retaking: retaking,
     onRetake: retake,
     onDone: onExit,
-    onNextModule
+    onNextModule,
+    nextModuleAvailable: nextModuleAvailable
   }), step > 0 && !isComplete && /*#__PURE__*/React.createElement("button", {
     onClick: previous,
     style: {
@@ -2202,7 +2204,7 @@ function LegacyComplete({
   })));
 }
 
-function Complete({ score, total, writtenTotal, badgeTitle, passed, result, error, completing, retaking, onRetake, onDone, onNextModule }) {
+function Complete({ score, total, writtenTotal, badgeTitle, passed, result, error, completing, retaking, onRetake, onDone, onNextModule, nextModuleAvailable }) {
   const mcqScore = result?.mcq_score ?? score;
   const mcqTotal = result?.mcq_total ?? total;
   const writtenScore = result?.written_score;
@@ -2218,7 +2220,7 @@ function Complete({ score, total, writtenTotal, badgeTitle, passed, result, erro
           : /*#__PURE__*/React.createElement("p", { style: styles.coverSub }, "MCQ: ", mcqScore, "/", mcqTotal, ". Written: ", writtenScore, "/", writtenMax, ". Overall: ", result?.overall_percent, "%. The pass mark is 80%.", passed ? " Module passed — great work." : " You can retake the exam."),
     result && /*#__PURE__*/React.createElement("div", { style: styles.scoreBox }, /*#__PURE__*/React.createElement("span", { style: styles.scoreNum }, result.overall_percent, "%"), /*#__PURE__*/React.createElement("span", { style: styles.scoreLabel }, "Overall score")),
     !passed && !completing && /*#__PURE__*/React.createElement("button", { style: styles.primaryBtn, onClick: onRetake, disabled: retaking, "aria-busy": retaking }, retaking ? "Starting exam…" : "Retake exam", !retaking && /*#__PURE__*/React.createElement(Icon, { name: "arrow", className: "icon-sm" })),
-    !completing && passed && onNextModule && /*#__PURE__*/React.createElement("button", { style: { ...styles.primaryBtn, marginTop: 12 }, onClick: onNextModule }, "Continue to next module ", /*#__PURE__*/React.createElement(Icon, { name: "arrow", className: "icon-sm" })),
+    !completing && passed && nextModuleAvailable && onNextModule && /*#__PURE__*/React.createElement("button", { style: { ...styles.primaryBtn, marginTop: 12 }, onClick: onNextModule }, "Continue to next module ", /*#__PURE__*/React.createElement(Icon, { name: "arrow", className: "icon-sm" })),
     !completing && /*#__PURE__*/React.createElement("button", { style: { ...styles.primaryBtn, marginTop: 12 }, onClick: onDone, disabled: retaking }, "Back to modules ", /*#__PURE__*/React.createElement(Icon, { name: "arrow", className: "icon-sm" })));
 }
 
@@ -3537,9 +3539,13 @@ function App() {
     setScreen("home");
     setActiveMod(null);
   }
+  function getNextAvailableModule(moduleId) {
+    return MODULES.find(module => module.id === Number(moduleId) + 1 && module.available) || null;
+  }
   function continueToNextModule(moduleId) {
-    const nextModule = MODULES.find(module => module.id === moduleId + 1 && module.available);
+    const nextModule = getNextAvailableModule(moduleId);
     if (nextModule) {
+      setModuleResumeSnapshot(null);
       setActiveMod(nextModule);
       setScreen("module");
     } else {
@@ -3600,6 +3606,7 @@ function App() {
     onOpenCourseGuide: () => openCourseGuide("home"),
     onLogout: handleLogout
   }), screen === "module" && activeMod && MODULE_DATA[activeMod.id] && /*#__PURE__*/React.createElement(ModuleFlow, {
+    key: activeMod.id,
     moduleData: MODULE_DATA[activeMod.id],
     session: session,
     onExit: exitToHome,
@@ -3607,6 +3614,7 @@ function App() {
     resumeSnapshot: moduleResumeSnapshot,
     onFinish: (score, total, passed) => finishModule(activeMod.id, score, total, passed),
     onNextModule: () => continueToNextModule(activeMod.id),
+    nextModuleAvailable: Boolean(getNextAvailableModule(activeMod.id)),
     isManager: session?.role === "manager",
     onManagerDashboard: () => setScreen("manager-dashboard"),
     onLogout: handleLogout

@@ -2743,6 +2743,12 @@ function ManagerDashboard({
   const [newSex, setNewSex] = React.useState("");
   const [newPin, setNewPin] = React.useState("");
   const [newRole, setNewRole] = React.useState("staff");
+  const [editingProfileId, setEditingProfileId] = React.useState(null);
+  const [profileFullName, setProfileFullName] = React.useState("");
+  const [profileDepartment, setProfileDepartment] = React.useState("");
+  const [profileAgeRange, setProfileAgeRange] = React.useState("");
+  const [profileSex, setProfileSex] = React.useState("");
+  const [profileSaving, setProfileSaving] = React.useState(false);
   const [saving, setSaving] = React.useState(false);
   const [notice, setNotice] = React.useState("");
   const [resetTarget, setResetTarget] = React.useState(null); // staff_id currently resetting
@@ -2822,6 +2828,48 @@ function ManagerDashboard({
     setError("");
     setResetTarget(null);
     setResetPin("");
+  }
+  function beginEditProfile(staff) {
+    setEditingProfileId(staff.staff_id);
+    setProfileFullName(staff.full_name || "");
+    setProfileDepartment(staff.department || "");
+    setProfileAgeRange(staff.age_range || "");
+    setProfileSex(staff.sex || "");
+    setError("");
+  }
+  async function handleSaveProfile(e, staffId) {
+    e.preventDefault();
+    if (!profileFullName.trim() || !profileDepartment.trim()) {
+      setError("Enter the staff member’s full name and department.");
+      return;
+    }
+    setError("");
+    setProfileSaving(true);
+    const { data, error: rpcError } = await callRpc("update_staff_profile", {
+      p_staff_id: staffId,
+      p_full_name: profileFullName.trim(),
+      p_department: profileDepartment.trim(),
+      p_age_range: profileAgeRange || null,
+      p_sex: profileSex || null
+    });
+    setProfileSaving(false);
+    if (rpcError || !data?.success) {
+      const detail = data?.error || rpcError?.message || "unknown_error";
+      const messages = {
+        name_taken: "That name is already in use.",
+        invalid_full_name: "Enter a valid full name.",
+        invalid_department: "Enter a department of up to 80 characters.",
+        invalid_age_range: "Choose a valid age range or leave it blank.",
+        invalid_sex: "Choose a valid sex option or leave it blank.",
+        staff_not_found: "That staff profile could not be found in this restaurant."
+      };
+      setError(messages[detail] || `Couldn’t save profile (${detail}).`);
+      return;
+    }
+    setEditingProfileId(null);
+    setNotice(`${profileFullName.trim()}’s profile was updated.`);
+    setError("");
+    await loadDashboard();
   }
 
   // Group flat rows by staff member
@@ -3039,7 +3087,47 @@ function ManagerDashboard({
       style: styles.moduleCardNum
     }, "MANAGER")), /*#__PURE__*/React.createElement("span", {
       style: { ...styles.moduleCardBlurb, display: "block", marginTop: 3 }
-    }, profileSummary), /*#__PURE__*/React.createElement("span", {
+    }, profileSummary), editingProfileId === s.staff_id ? /*#__PURE__*/React.createElement("form", {
+      onSubmit: e => handleSaveProfile(e, s.staff_id),
+      style: { display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(180px,1fr))", gap: 10, marginTop: 12, padding: 12, background: "#F1E9DA", borderRadius: 12 }
+    }, /*#__PURE__*/React.createElement("label", { style: styles.section }, /*#__PURE__*/React.createElement("span", { style: styles.sectionLabel }, "Full name"), /*#__PURE__*/React.createElement("input", {
+      style: styles.textInput,
+      value: profileFullName,
+      onChange: e => setProfileFullName(e.target.value),
+      maxLength: 160,
+      required: true
+    })), /*#__PURE__*/React.createElement("label", { style: styles.section }, /*#__PURE__*/React.createElement("span", { style: styles.sectionLabel }, "Department"), /*#__PURE__*/React.createElement("input", {
+      style: styles.textInput,
+      value: profileDepartment,
+      onChange: e => setProfileDepartment(e.target.value),
+      maxLength: 80,
+      required: true
+    })), /*#__PURE__*/React.createElement("label", { style: styles.section }, /*#__PURE__*/React.createElement("span", { style: styles.sectionLabel }, "Age range (optional)"), /*#__PURE__*/React.createElement("select", {
+      style: styles.textInput,
+      value: profileAgeRange,
+      onChange: e => setProfileAgeRange(e.target.value)
+    }, /*#__PURE__*/React.createElement("option", { value: "" }, "Not provided"), ageRangeOptions.map(option => /*#__PURE__*/React.createElement("option", { key: option.value, value: option.value }, option.label)))), /*#__PURE__*/React.createElement("label", { style: styles.section }, /*#__PURE__*/React.createElement("span", { style: styles.sectionLabel }, "Sex (optional)"), /*#__PURE__*/React.createElement("select", {
+      style: styles.textInput,
+      value: profileSex,
+      onChange: e => setProfileSex(e.target.value)
+    }, /*#__PURE__*/React.createElement("option", { value: "" }, "Not provided"), sexOptions.map(option => /*#__PURE__*/React.createElement("option", { key: option.value, value: option.value }, option.label)))), /*#__PURE__*/React.createElement("p", {
+      style: { ...styles.moduleCardBlurb, gridColumn: "1 / -1", margin: 0, lineHeight: 1.4 }
+    }, "Age range and sex are optional; leave as Not provided to clear them. These details are visible only to managers at this restaurant and do not affect scores."), /*#__PURE__*/React.createElement("div", {
+      style: { display: "flex", gap: 8, flexWrap: "wrap", gridColumn: "1 / -1" }
+    }, /*#__PURE__*/React.createElement("button", {
+      type: "submit",
+      style: { ...styles.primaryBtn, marginTop: 0 },
+      disabled: profileSaving
+    }, profileSaving ? "Saving profile…" : "Save Profile"), /*#__PURE__*/React.createElement("button", {
+      type: "button",
+      style: { ...styles.statusPill, ...styles.pillSoon, border: "none", cursor: "pointer" },
+      disabled: profileSaving,
+      onClick: () => { setEditingProfileId(null); setError(""); }
+    }, "Cancel"))) : /*#__PURE__*/React.createElement("button", {
+      type: "button",
+      style: { ...styles.statusPill, ...styles.pillSoon, marginTop: 10, cursor: "pointer", border: "none" },
+      onClick: () => beginEditProfile(s)
+    }, "Edit Profile"), /*#__PURE__*/React.createElement("span", {
       style: styles.moduleCardBlurb
     }, doneCount, " of ", MODULES.length, " modules complete"), /*#__PURE__*/React.createElement("div", {
       style: {

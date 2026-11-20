@@ -2927,7 +2927,7 @@ function ManagerDashboard({
     const completed = staffList.filter(s => s.byModule[m.id] === "complete").length;
     return { ...m, completed, rate: totalStaff ? Math.round(completed / totalStaff * 100) : 0 };
   });
-  const selectedStaff = staffList.find(s => s.staff_id === staffFilterId);
+  const selectedStaff = accountList.find(s => s.staff_id === staffFilterId);
   const selectedRecords = selectedStaff ? Object.values(selectedStaff.records) : [];
   const selectedScores = selectedRecords.filter(r => Number.isFinite(Number(r.quiz_score)) && Number(r.quiz_total) > 0);
   const selectedAverageScore = selectedScores.length ? Math.round(selectedScores.reduce((sum, r) => sum + Number(r.quiz_score) / Number(r.quiz_total) * 100, 0) / selectedScores.length) : null;
@@ -3038,7 +3038,7 @@ function ManagerDashboard({
     style: styles.feedbackText
   }, error)), notice && /*#__PURE__*/React.createElement("div", { style: { ...styles.feedbackBox, ...styles.feedbackGood, marginBottom: 14 } }, /*#__PURE__*/React.createElement("p", { style: styles.feedbackText }, notice)), rows && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
     style: { ...styles.syllabusBox, marginBottom: 12, padding: "12px 14px" }
-  }, /*#__PURE__*/React.createElement("p", { style: { ...styles.moduleCardBlurb, margin: "0 0 6px", lineHeight: 1.4 } }, "These figures summarize module completion across staff accounts at this restaurant; manager accounts are excluded. In-progress modules are not counted as complete."), /*#__PURE__*/React.createElement("details", { style: { fontSize: "0.84rem", color: COLORS.stone } }, /*#__PURE__*/React.createElement("summary", { style: { cursor: "pointer", fontWeight: 700 } }, "Learn more about the calculations"), /*#__PURE__*/React.createElement("ul", { style: { margin: "8px 0 0", paddingLeft: 20, lineHeight: 1.5 } }, /*#__PURE__*/React.createElement("li", null, "Analytics include staff accounts only. Manager accounts remain listed for account management but are excluded from training figures."), /*#__PURE__*/React.createElement("li", null, "Modules done counts completed modules across staff accounts. Completion divides that count by all possible staff-account-and-module combinations; each module percentage is the share of staff accounts that completed that module."), /*#__PURE__*/React.createElement("li", null, "For an individual, Progress is completed modules out of the course total. Avg quiz is the simple average of saved module quiz percentages. Last active is the latest module-progress update, not necessarily the last sign-in.")))), /*#__PURE__*/React.createElement("div", {
+  }, /*#__PURE__*/React.createElement("p", { style: { ...styles.moduleCardBlurb, margin: "0 0 6px", lineHeight: 1.4 } }, "Team summaries and module rates cover staff accounts only; managers are excluded. In-progress modules are not counted as complete. Select any account below to view its individual training record."), /*#__PURE__*/React.createElement("details", { style: { fontSize: "0.84rem", color: COLORS.stone } }, /*#__PURE__*/React.createElement("summary", { style: { cursor: "pointer", fontWeight: 700 } }, "Learn more about the calculations"), /*#__PURE__*/React.createElement("ul", { style: { margin: "8px 0 0", paddingLeft: 20, lineHeight: 1.5 } }, /*#__PURE__*/React.createElement("li", null, "Managers are excluded from team totals and module rates, but remain selectable for individual progress, quiz scores, written answers, and assessment history."), /*#__PURE__*/React.createElement("li", null, "Modules done counts completed modules across staff accounts. Completion divides that count by all possible staff-account-and-module combinations; each module percentage is the share of staff accounts that completed that module."), /*#__PURE__*/React.createElement("li", null, "For an individual, Progress is completed modules out of the course total. Avg quiz is the simple average of saved module quiz percentages. Last active is the latest module-progress update, not necessarily the last sign-in.")))), /*#__PURE__*/React.createElement("div", {
     style: { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(125px, 1fr))", gap: 10, marginBottom: 18 }
   }, [{ label: "Staff", value: totalStaff, description: "Number of staff accounts; manager accounts excluded" }, { label: "Completion", value: `${completionRate}%`, description: "Completed modules divided by all staff module assignments" }, { label: "Modules done", value: completedModules, description: "Completed modules across staff accounts" }].map(card => /*#__PURE__*/React.createElement("div", {
     key: card.label,
@@ -3056,15 +3056,15 @@ function ManagerDashboard({
     style: { ...styles.textInput, padding: "10px 12px" },
     value: staffFilterId,
     onChange: e => setStaffFilterId(e.target.value),
-  }, /*#__PURE__*/React.createElement("option", { value: "" }, "All staff"), staffList.map(s => /*#__PURE__*/React.createElement("option", {
+  }, /*#__PURE__*/React.createElement("option", { value: "" }, "All accounts"), accountList.map(s => /*#__PURE__*/React.createElement("option", {
     key: s.staff_id,
     value: s.staff_id
-  }, s.full_name))), /*#__PURE__*/React.createElement("button", {
+  }, s.role === "manager" ? `${s.full_name} (Manager)` : s.full_name))), /*#__PURE__*/React.createElement("button", {
     style: { ...styles.secondaryBtn, width: "auto", padding: "10px 14px" },
     onClick: loadDashboard
   }, "Refresh"))), selectedStaff && /*#__PURE__*/React.createElement("div", {
     style: { ...styles.syllabusBox, marginBottom: 16, border: `2px solid ${COLORS.marigold}` }
-  }, /*#__PURE__*/React.createElement("span", { style: styles.objLabel }, `Individual analytics · ${selectedStaff.full_name}`), /*#__PURE__*/React.createElement("span", { style: { ...styles.moduleCardBlurb, display: "block", marginTop: 4 } }, "A closer view of this staff member's progress, quiz average, and latest activity."), /*#__PURE__*/React.createElement("div", {
+  }, /*#__PURE__*/React.createElement("span", { style: styles.objLabel }, `Individual analytics · ${selectedStaff.full_name}`), /*#__PURE__*/React.createElement("span", { style: { ...styles.moduleCardBlurb, display: "block", marginTop: 4 } }, "A closer view of this account's progress, quiz average, and latest activity."), /*#__PURE__*/React.createElement("div", {
     style: { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(120px, 1fr))", gap: 8, margin: "12px 0" }
   }, [{ label: "Modules", value: `${selectedDone}/${MODULES.length}` }, { label: "Progress", value: `${Math.round(selectedDone / MODULES.length * 100)}%` }, { label: "Avg quiz", value: selectedAverageScore === null ? "—" : `${selectedAverageScore}%` }, { label: "Last active", value: selectedLastActive ? new Date(selectedLastActive).toLocaleDateString() : "—" }].map(card => /*#__PURE__*/React.createElement("div", {
     key: card.label,
@@ -3154,9 +3154,9 @@ function ManagerDashboard({
       type: "button",
       style: { ...styles.statusPill, ...styles.pillSoon, marginTop: 10, cursor: "pointer", border: "none" },
       onClick: () => beginEditProfile(s)
-    }, "Edit Profile"), s.role !== "manager" && /*#__PURE__*/React.createElement("span", {
+    }, "Edit Profile"), /*#__PURE__*/React.createElement("span", {
       style: styles.moduleCardBlurb
-    }, doneCount, " of ", MODULES.length, " modules complete"), s.role !== "manager" && /*#__PURE__*/React.createElement("div", {
+    }, doneCount, " of ", MODULES.length, " modules complete"), /*#__PURE__*/React.createElement("div", {
       style: {
         display: "flex",
         gap: 4,

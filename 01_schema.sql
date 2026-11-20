@@ -44,8 +44,8 @@ create table if not exists public.staff (
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
   constraint staff_department_valid check (department is null or length(btrim(department)) between 1 and 80),
-  constraint staff_age_range_valid check (age_range is null or age_range in ('under_18','18_24','25_34','35_44','45_54','55_plus','prefer_not_to_say')),
-  constraint staff_sex_valid check (sex is null or sex in ('female','male','intersex','prefer_not_to_say'))
+  constraint staff_age_range_valid check (age_range is null or age_range in ('18_25','26_30','31_35','over_35')),
+  constraint staff_sex_valid check (sex is null or sex in ('female','male'))
 );
 
 create index if not exists staff_restaurant_idx on public.staff (restaurant_id);

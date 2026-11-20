@@ -14,9 +14,9 @@ alter table public.staff
   add constraint staff_department_valid
     check (department is null or length(btrim(department)) between 1 and 80),
   add constraint staff_age_range_valid
-    check (age_range is null or age_range in ('under_18','18_24','25_34','35_44','45_54','55_plus','prefer_not_to_say')),
+    check (age_range is null or age_range in ('18_25','26_30','31_35','over_35')),
   add constraint staff_sex_valid
-    check (sex is null or sex in ('female','male','intersex','prefer_not_to_say'));
+    check (sex is null or sex in ('female','male'));
 
 drop function if exists public.create_staff(uuid,text,text,text,text);
 drop function if exists public.create_staff(uuid,text,text,text,text,text,text,text);
@@ -61,10 +61,10 @@ begin
   if p_department is null or length(v_department) not between 1 and 80 then
     return jsonb_build_object('success',false,'error','invalid_department');
   end if;
-  if p_age_range is not null and p_age_range not in ('under_18','18_24','25_34','35_44','45_54','55_plus','prefer_not_to_say') then
+  if p_age_range is not null and p_age_range not in ('18_25','26_30','31_35','over_35') then
     return jsonb_build_object('success',false,'error','invalid_age_range');
   end if;
-  if p_sex is not null and p_sex not in ('female','male','intersex','prefer_not_to_say') then
+  if p_sex is not null and p_sex not in ('female','male') then
     return jsonb_build_object('success',false,'error','invalid_sex');
   end if;
 

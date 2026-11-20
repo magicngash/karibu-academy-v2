@@ -2915,9 +2915,10 @@ function ManagerDashboard({
       staffMap[r.staff_id].records[r.module_id] = r;
     }
   });
-  const staffList = Object.values(staffMap);
+  const accountList = Object.values(staffMap);
+  const staffList = accountList.filter(s => s.role !== "manager");
   const [staffFilterId, setStaffFilterId] = React.useState("");
-  const filteredStaff = staffList.filter(s => !staffFilterId || s.staff_id === staffFilterId);
+  const filteredStaff = accountList.filter(s => !staffFilterId || s.staff_id === staffFilterId);
   const totalStaff = staffList.length;
   const completedModules = staffList.reduce((sum, s) => sum + MODULES.filter(m => s.byModule[m.id] === "complete").length, 0);
   const totalPossibleModules = totalStaff * MODULES.length;
@@ -3037,14 +3038,14 @@ function ManagerDashboard({
     style: styles.feedbackText
   }, error)), notice && /*#__PURE__*/React.createElement("div", { style: { ...styles.feedbackBox, ...styles.feedbackGood, marginBottom: 14 } }, /*#__PURE__*/React.createElement("p", { style: styles.feedbackText }, notice)), rows && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement("div", {
     style: { ...styles.syllabusBox, marginBottom: 12, padding: "12px 14px" }
-  }, /*#__PURE__*/React.createElement("p", { style: { ...styles.moduleCardBlurb, margin: "0 0 6px", lineHeight: 1.4 } }, "These figures summarize module completion across all accounts at this restaurant. In-progress modules are not counted as complete."), /*#__PURE__*/React.createElement("details", { style: { fontSize: "0.84rem", color: COLORS.stone } }, /*#__PURE__*/React.createElement("summary", { style: { cursor: "pointer", fontWeight: 700 } }, "Learn more about the calculations"), /*#__PURE__*/React.createElement("ul", { style: { margin: "8px 0 0", paddingLeft: 20, lineHeight: 1.5 } }, /*#__PURE__*/React.createElement("li", null, "Staff counts all accounts at this restaurant, including managers."), /*#__PURE__*/React.createElement("li", null, "Modules done counts completed modules across those accounts. Completion divides that count by all possible account-and-module combinations; each module percentage is the share of accounts that completed that module."), /*#__PURE__*/React.createElement("li", null, "For an individual, Progress is completed modules out of the course total. Avg quiz is the simple average of saved module quiz percentages. Last active is the latest module-progress update, not necessarily the last sign-in.")))), /*#__PURE__*/React.createElement("div", {
+  }, /*#__PURE__*/React.createElement("p", { style: { ...styles.moduleCardBlurb, margin: "0 0 6px", lineHeight: 1.4 } }, "These figures summarize module completion across staff accounts at this restaurant; manager accounts are excluded. In-progress modules are not counted as complete."), /*#__PURE__*/React.createElement("details", { style: { fontSize: "0.84rem", color: COLORS.stone } }, /*#__PURE__*/React.createElement("summary", { style: { cursor: "pointer", fontWeight: 700 } }, "Learn more about the calculations"), /*#__PURE__*/React.createElement("ul", { style: { margin: "8px 0 0", paddingLeft: 20, lineHeight: 1.5 } }, /*#__PURE__*/React.createElement("li", null, "Analytics include staff accounts only. Manager accounts remain listed for account management but are excluded from training figures."), /*#__PURE__*/React.createElement("li", null, "Modules done counts completed modules across staff accounts. Completion divides that count by all possible staff-account-and-module combinations; each module percentage is the share of staff accounts that completed that module."), /*#__PURE__*/React.createElement("li", null, "For an individual, Progress is completed modules out of the course total. Avg quiz is the simple average of saved module quiz percentages. Last active is the latest module-progress update, not necessarily the last sign-in.")))), /*#__PURE__*/React.createElement("div", {
     style: { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(125px, 1fr))", gap: 10, marginBottom: 18 }
-  }, [{ label: "Staff", value: totalStaff, description: "Number of people with staff accounts" }, { label: "Completion", value: `${completionRate}%`, description: "Percentage of assigned modules completed" }, { label: "Modules done", value: completedModules, description: "Completed modules across the team" }].map(card => /*#__PURE__*/React.createElement("div", {
+  }, [{ label: "Staff", value: totalStaff, description: "Number of staff accounts; manager accounts excluded" }, { label: "Completion", value: `${completionRate}%`, description: "Completed modules divided by all staff module assignments" }, { label: "Modules done", value: completedModules, description: "Completed modules across staff accounts" }].map(card => /*#__PURE__*/React.createElement("div", {
     key: card.label,
     style: { ...styles.scoreBox, alignItems: "flex-start", padding: "12px 14px" }
   }, /*#__PURE__*/React.createElement("span", { style: styles.scoreNum }, card.value), /*#__PURE__*/React.createElement("span", { style: styles.scoreLabel }, card.label), /*#__PURE__*/React.createElement("span", { style: { fontSize: "0.68rem", color: COLORS.stone, lineHeight: 1.2, marginTop: 4 } }, card.description)))), /*#__PURE__*/React.createElement("div", {
     style: { ...styles.syllabusBox, marginBottom: 16 }
-  }, /*#__PURE__*/React.createElement("span", { style: styles.objLabel }, "Module analytics"), /*#__PURE__*/React.createElement("span", { style: { ...styles.moduleCardBlurb, display: "block", marginTop: 4 } }, "Completion rate for each training module across the team."), moduleStats.map(m => /*#__PURE__*/React.createElement("div", {
+  }, /*#__PURE__*/React.createElement("span", { style: styles.objLabel }, "Module analytics"), /*#__PURE__*/React.createElement("span", { style: { ...styles.moduleCardBlurb, display: "block", marginTop: 4 } }, "Completion rate for each module across staff accounts; managers are excluded."), moduleStats.map(m => /*#__PURE__*/React.createElement("div", {
     key: m.id,
     style: { display: "flex", flexDirection: "column", gap: 5, marginTop: 10 }
   }, /*#__PURE__*/React.createElement("div", {
@@ -3153,9 +3154,9 @@ function ManagerDashboard({
       type: "button",
       style: { ...styles.statusPill, ...styles.pillSoon, marginTop: 10, cursor: "pointer", border: "none" },
       onClick: () => beginEditProfile(s)
-    }, "Edit Profile"), /*#__PURE__*/React.createElement("span", {
+    }, "Edit Profile"), s.role !== "manager" && /*#__PURE__*/React.createElement("span", {
       style: styles.moduleCardBlurb
-    }, doneCount, " of ", MODULES.length, " modules complete"), /*#__PURE__*/React.createElement("div", {
+    }, doneCount, " of ", MODULES.length, " modules complete"), s.role !== "manager" && /*#__PURE__*/React.createElement("div", {
       style: {
         display: "flex",
         gap: 4,

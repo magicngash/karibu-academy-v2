@@ -3914,7 +3914,23 @@ button { font-family: inherit; }
     box-sizing: border-box;
     height: 100vh;
     overflow: hidden;
-    padding: 24px 12px !important;
+    padding: 12px 8px !important;
+  }
+
+  .app-shell {
+    width: 100% !important;
+    max-width: 100% !important;
+    min-height: calc(100vh - 24px) !important;
+    border-radius: 18px !important;
+    box-shadow: 0 12px 32px rgba(0,0,0,0.28) !important;
+  }
+
+  .app-shell .screen {
+    padding: 22px 16px 28px !important;
+  }
+
+  .app-shell .home-header {
+    padding: 22px 16px 16px !important;
   }
 }
 `;

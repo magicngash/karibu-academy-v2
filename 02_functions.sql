@@ -109,7 +109,7 @@ returns jsonb language plpgsql security definer set search_path=pg_catalog,publi
 create or replace function public.owner_update_staff_limit(p_restaurant_id uuid,p_max_staff_users integer,p_auth_token text default null)
 returns jsonb language plpgsql security definer set search_path=pg_catalog,public,extensions,private,pg_temp as $$ begin
 if not exists(select 1 from private.auth(p_auth_token) where principal_type='owner') then return jsonb_build_object('success',false,'error','unauthorized'); end if;
-if p_max_staff_users is null or p_max_staff_users < 2 or p_max_staff_users > 100 or mod(p_max_staff_users,2) <> 0 then return jsonb_build_object('success',false,'error','invalid_staff_limit'); end if;
+if p_max_staff_users is null or p_max_staff_users < 2 or p_max_staff_users > 20 or mod(p_max_staff_users,2) <> 0 then return jsonb_build_object('success',false,'error','invalid_staff_limit'); end if;
 update public.restaurants set max_staff_users=p_max_staff_users where id=p_restaurant_id;
 return jsonb_build_object('success',true,'max_staff_users',p_max_staff_users); end; $$;
 

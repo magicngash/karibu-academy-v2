@@ -23,7 +23,7 @@
 // =====================================================================
 const SUPABASE_URL = window.KARIBU_SUPABASE_URL || "https://YOUR-V2-PROJECT.supabase.co";
 const AUTH_TOKEN_KEY = "karibu-v2-auth-token";
-const STAFF_LIMIT_OPTIONS = Array.from({ length: 50 }, (_, index) => (index + 1) * 2);
+const STAFF_LIMIT_OPTIONS = Array.from({ length: 10 }, (_, index) => (index + 1) * 2);
 
 function restaurantSlug(name) {
   return String(name || "restaurant").toLowerCase().trim().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "") || "restaurant";
@@ -97,7 +97,7 @@ function rpcErrorText(error, data) {
     pin_must_be_4_digits: "The manager PIN must contain exactly 4 digits.",
     "42P01": "The owner database migration is missing. Apply migration 08 in Supabase, then try again.",
     "PGRST202": "The owner_create_restaurant RPC is missing from the deployed Supabase schema. Apply migration 08, then reload the schema cache.",
-    invalid_staff_limit: "Choose an even staff limit between 2 and 100.",
+    invalid_staff_limit: "Choose an even staff limit between 2 and 20.",
     staff_limit_reached: "This restaurant has reached its active staff-user limit. Increase the limit or deactivate an existing staff account."
   };
   return known[raw] || String(raw);

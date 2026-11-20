@@ -1,5 +1,5 @@
 -- Add an owner-controlled active staff-user limit per restaurant.
--- The default is 20, with supported values from 2 through 100 in increments of 2.
+-- The default is 20, with supported values from 2 through 20 in increments of 2.
 ALTER TABLE public.restaurants
   ADD COLUMN IF NOT EXISTS max_staff_users integer;
 
@@ -16,7 +16,7 @@ ALTER TABLE public.restaurants
 
 ALTER TABLE public.restaurants
   ADD CONSTRAINT restaurants_max_staff_users_valid
-  CHECK (max_staff_users BETWEEN 2 AND 100 AND mod(max_staff_users, 2) = 0);
+  CHECK (max_staff_users BETWEEN 2 AND 20 AND mod(max_staff_users, 2) = 0);
 
 CREATE OR REPLACE FUNCTION public.owner_list_restaurants(p_auth_token text default null)
 RETURNS SETOF jsonb
@@ -56,7 +56,7 @@ BEGIN
   IF NOT EXISTS (SELECT 1 FROM private.auth(p_auth_token) WHERE principal_type='owner') THEN
     RETURN jsonb_build_object('success',false,'error','unauthorized');
   END IF;
-  IF p_max_staff_users IS NULL OR p_max_staff_users < 2 OR p_max_staff_users > 100 OR mod(p_max_staff_users,2) <> 0 THEN
+  IF p_max_staff_users IS NULL OR p_max_staff_users < 2 OR p_max_staff_users > 20 OR mod(p_max_staff_users,2) <> 0 THEN
     RETURN jsonb_build_object('success',false,'error','invalid_staff_limit');
   END IF;
   UPDATE public.restaurants SET max_staff_users=p_max_staff_users WHERE id=p_restaurant_id;

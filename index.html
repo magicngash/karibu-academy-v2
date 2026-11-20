@@ -1121,6 +1121,7 @@ function CompletionStatusBanner({ status, error, progress }) {
 function ModuleFlow({
   moduleData,
   session,
+  branding,
   onExit,
   onFinish,
   onNextModule,
@@ -1668,7 +1669,9 @@ function ModuleFlow({
     lesson: lessons[step - 1],
     onNext: next,
     index: step - 1,
-    count: lessons.length
+    count: lessons.length,
+    restaurantName: branding?.name,
+    trainerName: session?.fullName?.trim()?.split(/\s+/)[0] || ""
   }), step === lessons.length + 1 && takeaways && /*#__PURE__*/React.createElement(Takeaways, {
     items: takeaways,
     onNext: next
@@ -1788,8 +1791,16 @@ function LessonCard({
   lesson,
   onNext,
   index,
-  count
+  count,
+  restaurantName,
+  trainerName
 }) {
+  const scriptText = script => {
+    if (script.label?.toLowerCase() !== "standard welcome script") return script.text;
+    return script.text
+      .replace("[Establishment Name]", restaurantName || "your restaurant")
+      .replace("My name is [Name]", `My name is ${trainerName || "your name"}`);
+  };
   return /*#__PURE__*/React.createElement("div", {
     style: styles.cardWrap
   }, /*#__PURE__*/React.createElement("div", {
@@ -1838,7 +1849,7 @@ function LessonCard({
       ...styles.exampleBox,
       fontStyle: "italic"
     }
-  }, s.text)))), /*#__PURE__*/React.createElement("div", {
+  }, scriptText(s)))), /*#__PURE__*/React.createElement("div", {
     style: styles.dots
   }, Array.from({
     length: count
@@ -2571,11 +2582,11 @@ function CourseGuideReader({ branding, onBack }) {
         "Complete modules in order and answer honestly in your own words.",
         "Use what you learn on your next shift and follow your restaurant’s procedures.",
         "Keep your account credentials private and use the same account whenever you return so your progress stays connected.",
-        "If an answer or progress does not appear as expected, keep the page open, follow the on-screen message, and contact your manager or coach.",
+        "If an answer or progress does not appear as expected, keep the page open, follow the on-screen message, and contact your manager.",
         "Your manager can confirm any certificate or participation record according to the restaurant’s policy."
       ]),
-      paragraph("Our promise: clear, practical training; a fair opportunity to review and retake; support from your coach or manager; and progress saved to your account."),
-      paragraph("Questions? If you need help with access, saved progress, or a result, contact your manager or coach.")
+      paragraph("Our promise: clear, practical training; a fair opportunity to review and retake; support from your manager; and progress saved to your account."),
+      paragraph("Questions? If you need help with access, saved progress, or a result, contact your manager.")
     )), React.createElement("button", {
       type: "button",
       style: { ...styles.primaryBtn, marginTop: 2 },
@@ -3789,6 +3800,7 @@ function App() {
     key: activeMod.id,
     moduleData: MODULE_DATA[activeMod.id],
     session: session,
+    branding: branding,
     onExit: exitToHome,
     resumeKey: `karibu-training:${RESTAURANT_ID}:${session?.staffId}:module:${activeMod.id}`,
     resumeSnapshot: moduleResumeSnapshot,

@@ -19,6 +19,7 @@ declare
   a public.auth_sessions;
   sid uuid;
   v_department text;
+  v_max_staff_users integer;
 begin
   select * into a from private.auth(p_auth_token);
   if a.principal_type is distinct from 'staff'
@@ -51,6 +52,12 @@ begin
       and lower(btrim(full_name))=lower(btrim(p_full_name))
   ) then
     return jsonb_build_object('success',false,'error','name_taken');
+  end if;
+
+  select max_staff_users into v_max_staff_users from public.restaurants where id=p_restaurant_id;
+  perform pg_advisory_xact_lock(hashtextextended(p_restaurant_id::text, 0));
+  if p_role <> 'manager' and (select count(*) from public.staff where restaurant_id=p_restaurant_id and role='staff' and active) >= v_max_staff_users then
+    return jsonb_build_object('success',false,'error','staff_limit_reached','max_staff_users',v_max_staff_users);
   end if;
 
   begin

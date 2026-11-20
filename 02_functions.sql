@@ -92,7 +92,7 @@ out:=private.issue('staff',s.id,s.restaurant_id); return out || jsonb_build_obje
 create or replace function public.owner_list_restaurants(p_auth_token text default null)
 returns setof jsonb language plpgsql security definer set search_path = pg_catalog, public, extensions, private, pg_temp as $$ begin
 if not exists(select 1 from private.auth(p_auth_token) a where a.principal_type='owner') then return; end if;
-return query select jsonb_build_object('id',id,'name',name,'app_name',app_name,'slug',slug,'payment_status',payment_status,'payment_note',payment_note) from public.restaurants order by name;
+return query select jsonb_build_object('id',r.id,'name',r.name,'app_name',r.app_name,'slug',r.slug,'payment_status',r.payment_status,'payment_note',r.payment_note,'max_staff_users',r.max_staff_users,'active_staff_count',(select count(*) from public.staff s where s.restaurant_id=r.id and s.role='staff' and s.active)) from public.restaurants r order by r.name;
 end; $$;
 
 create or replace function public.owner_create_restaurant(p_name text,p_app_name text,p_manager_name text,p_manager_pin text,p_auth_token text default null)
@@ -105,6 +105,13 @@ return jsonb_build_object('success',true,'restaurant_id',r.id); end; $$;
 
 create or replace function public.owner_update_branding(p_restaurant_id uuid,p_name text,p_app_name text,p_auth_token text default null)
 returns jsonb language plpgsql security definer set search_path=pg_catalog,public,extensions,private,pg_temp as $$ begin if not exists(select 1 from private.auth(p_auth_token) where principal_type='owner') then return jsonb_build_object('success',false,'error','unauthorized'); end if; update public.restaurants set name=btrim(p_name),app_name=btrim(p_app_name) where id=p_restaurant_id; return jsonb_build_object('success',true); end; $$;
+
+create or replace function public.owner_update_staff_limit(p_restaurant_id uuid,p_max_staff_users integer,p_auth_token text default null)
+returns jsonb language plpgsql security definer set search_path=pg_catalog,public,extensions,private,pg_temp as $$ begin
+if not exists(select 1 from private.auth(p_auth_token) where principal_type='owner') then return jsonb_build_object('success',false,'error','unauthorized'); end if;
+if p_max_staff_users is null or p_max_staff_users < 2 or p_max_staff_users > 100 or mod(p_max_staff_users,2) <> 0 then return jsonb_build_object('success',false,'error','invalid_staff_limit'); end if;
+update public.restaurants set max_staff_users=p_max_staff_users where id=p_restaurant_id;
+return jsonb_build_object('success',true,'max_staff_users',p_max_staff_users); end; $$;
 
 create or replace function public.owner_update_restaurant_status(p_restaurant_id uuid,p_status text,p_note text,p_auth_token text default null)
 returns jsonb language plpgsql security definer set search_path=pg_catalog,public,extensions,private,pg_temp as $$ begin if not exists(select 1 from private.auth(p_auth_token) where principal_type='owner') then return jsonb_build_object('success',false,'error','unauthorized'); end if; if p_status not in('active','overdue','blocked') then return jsonb_build_object('success',false,'error','invalid_status'); end if; update public.restaurants set payment_status=p_status,active=(p_status<>'blocked'),payment_note=p_note where id=p_restaurant_id; return jsonb_build_object('success',true); end; $$;

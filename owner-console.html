@@ -23,6 +23,7 @@
 // =====================================================================
 const SUPABASE_URL = window.KARIBU_SUPABASE_URL || "https://YOUR-V2-PROJECT.supabase.co";
 const AUTH_TOKEN_KEY = "karibu-v2-auth-token";
+const STAFF_LIMIT_OPTIONS = Array.from({ length: 50 }, (_, index) => (index + 1) * 2);
 
 function restaurantSlug(name) {
   return String(name || "restaurant").toLowerCase().trim().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "") || "restaurant";
@@ -95,7 +96,9 @@ function rpcErrorText(error, data) {
     unauthorized: "Your owner session has expired. Sign out and sign in again.",
     pin_must_be_4_digits: "The manager PIN must contain exactly 4 digits.",
     "42P01": "The owner database migration is missing. Apply migration 08 in Supabase, then try again.",
-    "PGRST202": "The owner_create_restaurant RPC is missing from the deployed Supabase schema. Apply migration 08, then reload the schema cache."
+    "PGRST202": "The owner_create_restaurant RPC is missing from the deployed Supabase schema. Apply migration 08, then reload the schema cache.",
+    invalid_staff_limit: "Choose an even staff limit between 2 and 100.",
+    staff_limit_reached: "This restaurant has reached its active staff-user limit. Increase the limit or deactivate an existing staff account."
   };
   return known[raw] || String(raw);
 }
@@ -221,6 +224,7 @@ function RestaurantRow({
 }) {
   const [name, setName] = React.useState(r.name);
   const [appName, setAppName] = React.useState(r.app_name || "Karibu Academy");
+  const [maxStaffUsers, setMaxStaffUsers] = React.useState(Number(r.max_staff_users) || 20);
   const [status, setStatus] = React.useState(r.payment_status);
   const [note, setNote] = React.useState(r.payment_note || "");
   const [saving, setSaving] = React.useState(false);
@@ -229,7 +233,7 @@ function RestaurantRow({
   const [confirmText, setConfirmText] = React.useState("");
   const [deleting, setDeleting] = React.useState(false);
   const [linkCopied, setLinkCopied] = React.useState(false);
-  const dirty = name !== r.name || appName !== (r.app_name || "Karibu Academy") || status !== r.payment_status || note !== (r.payment_note || "");
+  const dirty = name !== r.name || appName !== (r.app_name || "Karibu Academy") || maxStaffUsers !== (Number(r.max_staff_users) || 20) || status !== r.payment_status || note !== (r.payment_note || "");
   const meta = STATUS_META[status] || STATUS_META.active;
   const trainingUrl = trainingUrlForRestaurant(r);
   async function handleSave() {
@@ -241,6 +245,17 @@ function RestaurantRow({
         p_name: name,
         p_app_name: appName
       });
+    }
+    if (maxStaffUsers !== (Number(r.max_staff_users) || 20)) {
+      const limitResult = await callRpc("owner_update_staff_limit", {
+        p_restaurant_id: r.id,
+        p_max_staff_users: maxStaffUsers
+      });
+      if (limitResult.error || !limitResult.data?.success) {
+        setSaving(false);
+        setError(`Couldn't update the staff-user limit: ${rpcErrorText(limitResult.error, limitResult.data)}`);
+        return;
+      }
     }
     const {
       data,
@@ -255,6 +270,7 @@ function RestaurantRow({
       setSaved(true);
       r.name = name;
       r.app_name = appName;
+      r.max_staff_users = maxStaffUsers;
       r.payment_status = status;
       r.payment_note = note;
     }
@@ -356,6 +372,21 @@ function RestaurantRow({
     onChange: e => setAppName(e.target.value),
     placeholder: "e.g. Karibu Academy"
   })), /*#__PURE__*/React.createElement("div", {
+    style: {
+      marginTop: 12
+    }
+  }, /*#__PURE__*/React.createElement("label", {
+    style: styles.label
+  }, "Active staff-user limit"), /*#__PURE__*/React.createElement("select", {
+    style: styles.input,
+    value: maxStaffUsers,
+    onChange: e => setMaxStaffUsers(Number(e.target.value))
+  }, STAFF_LIMIT_OPTIONS.map(limit => /*#__PURE__*/React.createElement("option", {
+    key: limit,
+    value: limit
+  }, `${limit} active staff users`))), /*#__PURE__*/React.createElement("small", {
+    style: { display: "block", marginTop: 5, color: COLORS.stone }
+  }, `${r.active_staff_count || 0} active staff users currently enrolled`)), /*#__PURE__*/React.createElement("div", {
     style: {
       display: "flex",
       gap: 10,

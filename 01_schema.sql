@@ -7,6 +7,7 @@ create table if not exists public.restaurants (
   id uuid primary key default gen_random_uuid(),
   name text not null check (length(btrim(name)) between 1 and 160),
   app_name text not null default 'Karibu Academy' check (length(btrim(app_name)) between 1 and 160),
+  max_staff_users integer not null default 20 check (max_staff_users between 2 and 100 and mod(max_staff_users, 2) = 0),
   slug text not null unique check (slug = lower(slug) and slug ~ '^[a-z0-9]+(?:-[a-z0-9]+)*$'),
   payment_status text not null default 'active' check (payment_status in ('active','overdue','blocked')),
   active boolean not null default true,

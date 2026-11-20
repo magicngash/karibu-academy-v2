@@ -2839,7 +2839,8 @@ function ManagerDashboard({
         name_taken: "That name is already in use.",
         invalid_department: "Enter a department of up to 80 characters.",
         invalid_age_range: "Choose a valid age range or leave it blank.",
-        invalid_sex: "Choose a valid sex option or leave it blank."
+        invalid_sex: "Choose a valid sex option or leave it blank.",
+        staff_limit_reached: `This restaurant has reached its active staff-user limit${data?.max_staff_users ? ` of ${data.max_staff_users}` : ""}. Ask the owner to increase the limit or deactivate an existing staff account.`
       };
       setError(messages[detail] || `Couldn't add that staff member (${detail}).`);
       return;
@@ -2901,6 +2902,7 @@ function ManagerDashboard({
         invalid_department: "Enter a department of up to 80 characters.",
         invalid_age_range: "Choose a valid age range or leave it blank.",
         invalid_sex: "Choose a valid sex option or leave it blank.",
+        staff_limit_reached: "The active staff-user limit has been reached. Ask the owner to increase the limit.",
         staff_not_found: "That staff profile could not be found in this restaurant."
       };
       setError(messages[detail] || `Couldn’t save profile (${detail}).`);

@@ -2574,8 +2574,12 @@ function CourseGuideReader({ branding, onBack }) {
       bullets([
         "Topical notes — Read the lesson for its main ideas and practical standards.",
         "Summary takeaways — Review the key points before the assessment.",
-        "Case study or role-play — Think through a realistic restaurant situation; discuss your approach with a coach or colleague when appropriate.",
-        "Assessment — Answer the multiple-choice questions for that module and five written questions. Choose the best response for each multiple-choice item and answer written questions in your own words."
+        "Case study or role-play — Think through a realistic restaurant situation; discuss your approach with a coach or colleague when appropriate."
+      ]),
+      React.createElement("p", { style: { ...styles.moduleCardBlurb, margin: "12px 0 6px" } }, React.createElement("strong", null, "Assessment"), " — Complete the multiple-choice and open-ended questions for this module."),
+      bullets([
+        "Multiple-Choice Questions: Select the best answer for each question.",
+        "Open-Ended Questions: Answer all five questions in your own words, providing clear and complete explanations."
       ])
     )), section("assessment", "5. Assessment, results, and retakes", React.createElement(React.Fragment, null,
       React.createElement("h3", { style: { ...headingStyle, fontSize: "0.98rem", marginTop: 14 } }, "Save each written response"),

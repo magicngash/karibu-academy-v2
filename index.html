@@ -32,6 +32,7 @@ const AUTH_TOKEN_KEY = "karibu-v2-auth-token";
 const COURSE_GUIDE_VERSION = "service-training-guide-v1";
 // Supported links: /training?r=<id> (legacy) or /<restaurant-slug> (preferred).
 const routeParams = new URLSearchParams(window.location.search);
+const PREVIEW_MODE = routeParams.get("preview") === "1";
 const routeParts = window.location.pathname.split("/").filter(Boolean);
 const ROUTE_SLUG = routeParts.length === 1 && !["training", "index.html", "console"].includes(routeParts[0]) ? routeParts[0].toLowerCase() : "";
 let RESTAURANT_ID = routeParams.get("r") || "";
@@ -1729,7 +1730,8 @@ function ModuleFlow({
 
 function CourseLanding({
   moduleData,
-  onStart
+  onStart,
+  previewMode = false
 }) {
   const curriculum = [...moduleData.lessons.map(l => ({
     label: l.title,
@@ -1740,11 +1742,11 @@ function CourseLanding({
   } : {
     label: "Key Takeaways",
     type: "review"
-  }, {
+  }, ...(!previewMode ? [{
     label: "Module Quiz",
     type: "quiz",
     meta: `${moduleData.quiz.length} questions`
-  }];
+  }] : [])];
   return /*#__PURE__*/React.createElement("div", {
     style: styles.coverWrap
   }, /*#__PURE__*/React.createElement("span", {
@@ -1783,7 +1785,7 @@ function CourseLanding({
   }, c.meta))))), /*#__PURE__*/React.createElement("button", {
     style: styles.primaryBtn,
     onClick: onStart
-  }, "Start module ", /*#__PURE__*/React.createElement(Icon, {
+  }, previewMode ? "Start preview " : "Start module ", /*#__PURE__*/React.createElement(Icon, {
     name: "arrow",
     className: "icon-sm"
   })));
@@ -3455,7 +3457,28 @@ function SignOutButton({ onLogout }) {
     style: styles.globalSignOutBtn
   }, "Sign out");
 }
+function OwnerPreview() {
+  const [access, setAccess] = React.useState("checking");
+  const [moduleId, setModuleId] = React.useState(1);
+  const [step, setStep] = React.useState(0);
+  const moduleData = MODULE_DATA[moduleId];
+  const reviewSteps = (moduleData?.takeaways ? 1 : 0) + (moduleData?.caseStudy ? 1 : 0);
+  const lastContentStep = moduleData ? moduleData.lessons.length + reviewSteps : 0;
+  React.useEffect(() => {
+    callRpc("owner_list_restaurants", {}).then(({ data, error }) => {
+      setAccess(error || data == null ? "denied" : "ready");
+    });
+  }, []);
+  function chooseModule(event) {
+    setModuleId(Number(event.target.value));
+    setStep(0);
+  }
+  if (access === "checking") return /*#__PURE__*/React.createElement("div", { className: "screen", style: styles.screen }, /*#__PURE__*/React.createElement("p", { style: styles.coverSub }, "Checking Owner Console access…"));
+  if (access === "denied") return /*#__PURE__*/React.createElement("div", { className: "screen", style: styles.screen, role: "alert" }, /*#__PURE__*/React.createElement("h1", { style: styles.coverTitle }, "Owner access required"), /*#__PURE__*/React.createElement("p", { style: styles.coverSub }, "Sign in to the Owner Console before opening the course preview."), /*#__PURE__*/React.createElement("button", { style: styles.primaryBtn, onClick: () => { window.location.href = "/owner-console.html"; } }, "Open Owner Console"));
+  return /*#__PURE__*/React.createElement("div", { className: "app-page", style: styles.page }, /*#__PURE__*/React.createElement("div", { className: "app-shell", style: styles.phone }, /*#__PURE__*/React.createElement("div", { style: { ...styles.topBar, background: COLORS.espresso } }, /*#__PURE__*/React.createElement("span", { style: { color: "#fff", fontWeight: 800 } }, "OWNER PREVIEW MODE"), /*#__PURE__*/React.createElement("button", { type: "button", style: { ...styles.textBtn, color: "#fff" }, onClick: () => { window.location.href = "/owner-console.html"; } }, "Back to Owner Console")), /*#__PURE__*/React.createElement("div", { className: "screen", style: styles.screen }, /*#__PURE__*/React.createElement("div", { style: { display: "flex", gap: 12, alignItems: "center", justifyContent: "space-between", marginBottom: 16, flexWrap: "wrap" } }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("span", { style: styles.eyebrowLight }, "READ-ONLY COURSE INSPECTION"), /*#__PURE__*/React.createElement("h1", { style: { ...styles.coverTitle, marginBottom: 4 } }, "Course Content Preview"), /*#__PURE__*/React.createElement("p", { style: { ...styles.coverSub, margin: 0 } }, "Assessments, progress, and completion records are disabled.")), /*#__PURE__*/React.createElement("label", { style: { minWidth: 220, color: COLORS.stone, fontWeight: 700 } }, "Module", /*#__PURE__*/React.createElement("select", { value: moduleId, onChange: chooseModule, style: { ...styles.textInput, marginTop: 6 } }, MODULES.map(module => /*#__PURE__*/React.createElement("option", { key: module.id, value: module.id }, `Module ${module.id} · ${module.title}`))))), moduleData && step === 0 && /*#__PURE__*/React.createElement(CourseLanding, { moduleData, previewMode: true, onStart: () => setStep(1) }), moduleData && step >= 1 && step <= moduleData.lessons.length && /*#__PURE__*/React.createElement(LessonCard, { lesson: moduleData.lessons[step - 1], onNext: () => setStep(value => Math.min(value + 1, lastContentStep)), index: step - 1, count: moduleData.lessons.length, restaurantName: "your restaurant", trainerName: "" }), moduleData && step === moduleData.lessons.length + 1 && moduleData.takeaways && /*#__PURE__*/React.createElement(Takeaways, { items: moduleData.takeaways, onNext: () => setStep(value => Math.min(value + 1, lastContentStep)) }), moduleData && step === moduleData.lessons.length + 1 + (moduleData.takeaways ? 1 : 0) && moduleData.caseStudy && /*#__PURE__*/React.createElement(CaseStudy, { data: moduleData.caseStudy, onNext: () => setStep(value => Math.min(value + 1, lastContentStep)) }), step > 0 && /*#__PURE__*/React.createElement("button", { type: "button", style: { ...styles.secondaryBtn, marginTop: 18 }, onClick: () => setStep(step >= lastContentStep ? 0 : Math.max(0, step - 1)) }, step >= lastContentStep ? "Back to module overview" : "Previous content"))));
+}
 function App() {
+  if (PREVIEW_MODE) return /*#__PURE__*/React.createElement(OwnerPreview);
   if (RESTAURANT_ROUTE_ERROR) {
     return /*#__PURE__*/React.createElement("div", {
       className: "screen",
@@ -4521,7 +4544,9 @@ class ErrorBoundary extends React.Component {
 }
 
 async function bootTrainingApp() {
-  if (ROUTE_SLUG && !routeParams.get("r")) {
+  if (PREVIEW_MODE) {
+    // Owner preview is content-only and does not require a restaurant route.
+  } else if (ROUTE_SLUG && !routeParams.get("r")) {
     const {
       data,
       error

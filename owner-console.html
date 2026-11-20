@@ -709,7 +709,10 @@ function Dashboard({
     style: styles.title
   }, "Owner Console"), /*#__PURE__*/React.createElement("p", {
     style: styles.subtitle
-  }, "Signed in as ", owner.fullName)), /*#__PURE__*/React.createElement("button", {
+  }, "Signed in as ", owner.fullName)), /*#__PURE__*/React.createElement("a", {
+    href: "/index.html?preview=1",
+    style: { ...styles.primaryBtn, textDecoration: "none", display: "inline-block", marginTop: 10 }
+  }, "Preview Course Content"), /*#__PURE__*/React.createElement("button", {
     onClick: onLogout,
     style: styles.textBtn
   }, "Sign out")), error && /*#__PURE__*/React.createElement("div", {

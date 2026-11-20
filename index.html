@@ -21,6 +21,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 </head>
 <body>
 <div id="root"></div>
+<script src="/case-study-answers.js"></script>
 <script>
 // =====================================================================
 // SUPABASE CONFIG
@@ -1939,7 +1940,13 @@ function CaseStudy({
       fontWeight: 600,
       marginBottom: 6
     }
-  }, q.q))), /*#__PURE__*/React.createElement("button", {
+  }, q.q), q.answer && /*#__PURE__*/React.createElement("p", {
+    style: {
+      ...styles.bodyText,
+      ...styles.exampleBox,
+      marginTop: 8
+    }
+  }, /*#__PURE__*/React.createElement("strong", null, "Suggested answer: "), q.answer))), /*#__PURE__*/React.createElement("button", {
     style: styles.primaryBtn,
     onClick: onNext
   }, "Start the quiz ", /*#__PURE__*/React.createElement(Icon, {
